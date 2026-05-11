@@ -11,5 +11,10 @@ header:
     - '.trivyignore'
     - 'LICENSE'
     - 'NOTICE'
+    - '.licenserc.yaml'
+    - '.mise.toml'
+    - '.pre-commit-config.yaml'
+    - '.yamllint'
+    - '**/*.gotmpl'
 
   comment: on-failure

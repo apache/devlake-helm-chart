@@ -13,5 +13,14 @@ header:
     - '.gitmodules'
     - 'charts/**/charts/**'
     - 'charts/**/Chart.lock'
+    - '.github/.licenserc.yaml'
+    - '.github/dependabot.yml'
+    - '.github/labeler.yml'
+    - '.github/actions/**/action.yml'
+    - '.licenserc.yaml'
+    - '.mise.toml'
+    - '.pre-commit-config.yaml'
+    - '.yamllint'
+    - '**/*.gotmpl'
 
   comment: on-failure
