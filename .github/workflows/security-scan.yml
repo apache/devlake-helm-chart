@@ -45,7 +45,7 @@ jobs:
           exit-code: '1'  # Fail on HIGH/CRITICAL findings (enforcement mode)
 
       - name: Upload Trivy results to Security tab
-        uses: github/codeql-action/upload-sarif@v3.35.4
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
           sarif_file: 'trivy-results.sarif'
@@ -74,7 +74,15 @@ jobs:
 
       - name: Template Helm chart
         run: |
-          helm template devlake charts/devlake > rendered-manifests.yaml
+          ENCRYPTION_SECRET=$(openssl rand -base64 2000 | tr -dc '[:upper:]' | fold -w 128 | head -n 1)
+          DB_PASSWORD=$(openssl rand -base64 32)
+          DB_ROOT_PASSWORD=$(openssl rand -base64 32)
+
+          helm template devlake charts/devlake \
+            --set lake.encryptionSecret.secret="${ENCRYPTION_SECRET}" \
+            --set database.password="${DB_PASSWORD}" \
+            --set database.mysql.rootPassword="${DB_ROOT_PASSWORD}" \
+            > rendered-manifests.yaml
 
       - name: Run Kubescape scan
         uses: kubescape/github-action@v3.0.21
@@ -85,7 +93,7 @@ jobs:
           # Enforcement mode enabled: scan will fail on security violations
 
       - name: Upload Kubescape results to Security tab
-        uses: github/codeql-action/upload-sarif@v3.35.4
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
           sarif_file: 'kubescape-results.sarif'

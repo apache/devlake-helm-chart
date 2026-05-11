@@ -65,8 +65,10 @@ jobs:
 
           ENCRYPTION_SECRET=$(openssl rand -base64 2000 | tr -dc '[:upper:]' | fold -w 128 | head -n 1)
           DB_PASSWORD=$(openssl rand -base64 32)
+          DB_ROOT_PASSWORD=$(openssl rand -base64 32)
           echo "::add-mask::${ENCRYPTION_SECRET}"
           echo "::add-mask::${DB_PASSWORD}"
+          echo "::add-mask::${DB_ROOT_PASSWORD}"
 
           helm install "$RELEASE_NAME" ./charts/devlake \
             --namespace "$NAMESPACE" \
@@ -74,7 +76,8 @@ jobs:
             --wait \
             --set database.type="${{ matrix.database }}" \
             --set lake.encryptionSecret.secret="${ENCRYPTION_SECRET}" \
-            --set database.password="${DB_PASSWORD}"
+            --set database.password="${DB_PASSWORD}" \
+            --set database.mysql.rootPassword="${DB_ROOT_PASSWORD}"
 
       - name: Dump diagnostics on failure
         if: failure()
