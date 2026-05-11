@@ -45,12 +45,8 @@ limitations under the License.
 {{- fail "backup.enabled=true is not supported with database.useExternal=true. Backups must be configured on the external database server directly." }}
 {{- end }}
 
-{{- if and (eq .Values.database.type "postgresql") .Values.grafana.enabled }}
-{{- fail "Grafana dashboards currently only support MySQL datasources. Set grafana.enabled=false when using PostgreSQL, or provide an external Grafana instance with manually configured PostgreSQL datasources via grafana.external.url" }}
-{{- end }}
-
-{{- if and (eq .Values.database.type "mysql") (not .Values.grafana.enabled) (or (not .Values.grafana.external.url) (eq .Values.grafana.external.url "")) }}
-{{- fail "When using MySQL with grafana.enabled=false, grafana.external.url must be set to a valid Grafana endpoint URL (e.g., http://grafana.example.com). Alternatively, set grafana.enabled=true to use the built-in Grafana instance." }}
+{{- if and (not .Values.grafana.enabled) (or (not .Values.grafana.external.url) (eq .Values.grafana.external.url "")) }}
+{{- fail "When grafana.enabled=false, grafana.external.url must be set to a valid Grafana endpoint URL (e.g., http://grafana.example.com). Alternatively, set grafana.enabled=true to use the built-in Grafana instance." }}
 {{- end }}
 
 {{- if or (not .Values.lake.resources.requests) (not .Values.lake.resources.requests.cpu) (not .Values.lake.resources.requests.memory) }}

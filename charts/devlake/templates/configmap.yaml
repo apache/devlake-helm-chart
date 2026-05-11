@@ -42,10 +42,15 @@ data:
   DB_LOCATION: "{{ .Values.commonEnvs.TZ }}"
   DB_CUSTOM_PARAMS: "{{ .Values.database.mysql.extraParams }}"
 {{- else if eq .Values.database.type "postgresql" }}
+  # Lake envs (DB_* prefix)
   DB_USER: "{{ .Values.database.username }}"
   DB_DATABASE: "{{ .Values.database.database }}"
   DB_URL: "{{ include "database.server" . }}:{{ include "database.port" . }}"
   DB_SERVER: "{{ include "database.server" . }}"
   DB_PORT: "{{ include "database.port" . }}"
   DB_CUSTOM_PARAMS: "{{ .Values.database.postgresql.extraParams }}"
+  # Grafana envs (POSTGRES_* prefix for entrypoint.sh)
+  POSTGRES_USER: "{{ .Values.database.username }}"
+  POSTGRES_DATABASE: "{{ .Values.database.database }}"
+  POSTGRES_URL: "{{ include "database.server" . }}:{{ include "database.port" . }}"
 {{- end }}
