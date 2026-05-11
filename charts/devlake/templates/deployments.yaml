@@ -56,6 +56,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "devlake.serviceAccountName" . }}
+      automountServiceAccountToken: false
       {{- with .Values.ui.securityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}
@@ -166,6 +167,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "devlake.serviceAccountName" . }}
+      automountServiceAccountToken: false
       {{- with .Values.lake.securityContext }}
       securityContext:
       {{- toYaml . | nindent 8 }}

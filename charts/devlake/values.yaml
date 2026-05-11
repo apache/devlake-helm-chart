@@ -200,6 +200,7 @@ grafana:
   serviceAccount:
     create: false
     nameOverride: "{{ include \"devlake.serviceAccountName\" . }}"
+  automountServiceAccountToken: false
   deploymentStrategy:
     type: Recreate
   adminPassword: ""
@@ -219,6 +220,28 @@ grafana:
   persistence:
     enabled: true
     size: 4Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  testFramework:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 100m
+        memory: 64Mi
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 65534
+      readOnlyRootFilesystem: true
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: ["ALL"]
   ingressServiceName: ""
   ingressServicePort: ""
 

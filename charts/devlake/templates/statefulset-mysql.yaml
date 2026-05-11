@@ -51,6 +51,7 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: {{ .Values.database.securityContext.runAsNonRoot }}
         runAsUser: {{ include "database.uid" . }}

@@ -39,6 +39,13 @@ spec:
       image: {{ if eq .Values.database.type "mysql" }}mysql:8{{ else }}postgres:14{{ end }}
       {{- end }}
       imagePullPolicy: IfNotPresent
+      resources:
+        requests:
+          cpu: 10m
+          memory: 64Mi
+        limits:
+          cpu: 200m
+          memory: 128Mi
       envFrom:
         - configMapRef:
             name: {{ include "devlake.db.configmap" . }}
@@ -73,6 +80,13 @@ spec:
     - name: test-http
       image: {{ .Values.alpine.image.repository }}:{{ .Values.alpine.image.tag }}
       imagePullPolicy: {{ .Values.alpine.image.pullPolicy }}
+      resources:
+        requests:
+          cpu: 10m
+          memory: 32Mi
+        limits:
+          cpu: 100m
+          memory: 64Mi
       command: ['sh', '-c']
       args:
         - |
