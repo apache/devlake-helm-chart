@@ -14,20 +14,24 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */}}
-
-{{- if .Values.extraResources }}
-{{- range .Values.extraResources }}
----
-{{- $resource := . | deepCopy }}
-
-{{- $objectLabels := include "devlake.labels" $ | fromYaml }}
-
-{{- if $resource.metadata.labels }}
-{{- $objectLabels = merge $objectLabels $resource.metadata.labels }}
-{{- end }}
-
-{{ $_ := set $resource.metadata "labels" $objectLabels -}}
-
-{{ toYaml $resource | nindent 0 }}
-{{- end }}
+{{- if and .Values.backup.enabled (not .Values.backup.pvc.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "devlake.fullname" . }}-backup
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "devlake.labels" . | nindent 4 }}
+    app.kubernetes.io/component: storage
+  annotations:
+    {{- include "devlake.annotations" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  {{- with .Values.backup.pvc.storageClassName }}
+  storageClassName: "{{ . }}"
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.backup.pvc.size | default "10Gi" }}
 {{- end }}

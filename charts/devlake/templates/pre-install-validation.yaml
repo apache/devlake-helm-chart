@@ -1,0 +1,142 @@
+{{/*
+Licensed to the Apache Software Foundation (ASF) under one or more
+contributor license agreements.  See the NOTICE file distributed with
+this work for additional information regarding copyright ownership.
+The ASF licenses this file to You under the Apache License, Version 2.0
+(the "License"); you may not use this file except in compliance with
+the License.  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "devlake.fullname" . }}-pre-install-validation
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "devlake.labels" . | nindent 4 }}
+    app.kubernetes.io/component: validation
+  annotations:
+    {{- include "devlake.annotations" . | nindent 4 }}
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded,hook-failed
+spec:
+  backoffLimit: 1
+  activeDeadlineSeconds: 60
+  template:
+    metadata:
+      labels:
+        {{- include "devlake.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: pre-install-validation
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: validation
+        image: "{{ .Values.alpine.image.repository }}:{{ .Values.alpine.image.tag }}"
+        imagePullPolicy: {{ .Values.alpine.image.pullPolicy }}
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            cpu: 100m
+            memory: 64Mi
+        securityContext:
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        command:
+        - sh
+        - -c
+        - |
+          #!/bin/sh
+          set -e
+
+          echo "Validating DevLake configuration..."
+
+          {{- if not .Values.externalSecrets.enabled }}
+          # Only validate when using internal secrets
+          {{- if .Values.option.autoCreateSecret }}
+
+          # Validation happens at Helm template time via validate.yaml
+          # This job just confirms template validation passed
+          echo "✓ Template validation passed"
+          echo "✓ database.type={{ .Values.database.type }}"
+          echo "✓ database.password is set"
+          {{- if eq .Values.database.type "mysql" }}
+          {{- if not .Values.database.useExternal }}
+          echo "✓ database.mysql.rootPassword is set"
+          {{- end }}
+          {{- end }}
+          {{- if .Values.lake.encryptionSecret.autoCreateSecret }}
+          echo "✓ lake.encryptionSecret.secret is set"
+          {{- end }}
+
+          {{- end }}
+
+          # Check UI basic auth password
+          {{- if .Values.ui.basicAuth.enabled }}
+          {{- if .Values.ui.basicAuth.autoCreateSecret }}
+          echo "✓ ui.basicAuth.password is set"
+          {{- end }}
+          {{- end }}
+
+          {{- end }}
+
+          # Check ingress hostname
+          {{- if .Values.ingress.enabled }}
+          if [ -z "{{ .Values.ingress.hostname }}" ]; then
+            echo "ERROR: ingress.hostname is required when ingress.enabled=true"
+            exit 1
+          fi
+          echo "✓ ingress.hostname is set: {{ .Values.ingress.hostname }}"
+          {{- end }}
+
+          # Security warnings (non-blocking)
+          {{- if not .Values.externalSecrets.enabled }}
+          {{- if .Values.option.autoCreateSecret }}
+          echo ""
+          echo "⚠️  WARNING: Using plaintext secrets in values.yaml"
+          echo "   For production, enable externalSecrets or provide pre-created secrets"
+          echo "   Example: helm install --set externalSecrets.enabled=true"
+          {{- end }}
+          {{- end }}
+
+          {{- if not .Values.networkPolicy.enabled }}
+          echo ""
+          echo "⚠️  WARNING: NetworkPolicy is disabled"
+          echo "   For production, set networkPolicy.enabled=true and configure externalEgressCIDRs"
+          echo "   See NOTES.txt after installation for configuration guidance"
+          {{- end }}
+
+          {{- if .Values.lake.hostNetwork }}
+          echo ""
+          echo "⚠️  DEPRECATION WARNING: lake.hostNetwork=true"
+          echo "   hostNetwork is DEPRECATED in v2.1.0 and will be REMOVED in v2.2.0"
+          echo "   Migrate to standard pod networking before upgrading to v2.2.0"
+          {{- end }}
+
+          {{- if eq .Values.database.storage.type "hostpath" }}
+          echo ""
+          echo "⚠️  DEPRECATION WARNING: database.storage.type=hostpath"
+          echo "   hostPath is DEPRECATED in v2.1.0 and will be REMOVED in v2.2.0"
+          echo "   Migrate to PVC storage before upgrading to v2.2.0"
+          {{- end }}
+
+          echo ""
+          echo "All validation checks passed successfully!"

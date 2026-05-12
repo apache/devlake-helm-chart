@@ -1,0 +1,368 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DevLake Helm Chart Values Schema",
+  "type": "object",
+  "required": ["database", "lake", "ui"],
+  "properties": {
+    "database": {
+      "type": "object",
+      "required": ["type", "username", "database"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["mysql", "postgresql"],
+          "description": "Database type - must be mysql or postgresql"
+        },
+        "username": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Database username"
+        },
+        "password": {
+          "type": "string",
+          "description": "Database password - leave empty when using externalSecrets"
+        },
+        "database": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Database name"
+        },
+        "useExternal": {
+          "type": "boolean",
+          "description": "Use external database server"
+        },
+        "externalServer": {
+          "type": "string",
+          "description": "External database server hostname"
+        },
+        "externalPort": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "description": "External database server port"
+        },
+        "replicaCount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1,
+          "description": "Database replica count (must be 1 for embedded mode)"
+        }
+      }
+    },
+    "externalSecrets": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable External Secrets Operator integration"
+        },
+        "secretName": {
+          "type": "string",
+          "description": "Name of the external secret"
+        },
+        "secretStoreRef": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "enum": ["SecretStore", "ClusterSecretStore"]
+            }
+          }
+        }
+      },
+      "if": {
+        "properties": {
+          "enabled": {
+            "const": true
+          }
+        }
+      },
+      "then": {
+        "required": ["secretName", "secretStoreRef"],
+        "properties": {
+          "secretStoreRef": {
+            "required": ["name"],
+            "properties": {
+              "name": {
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "lake": {
+      "type": "object",
+      "required": ["replicaCount", "image", "resources"],
+      "properties": {
+        "replicaCount": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Number of lake replicas"
+        },
+        "hostNetwork": {
+          "type": "boolean",
+          "const": false,
+          "description": "hostNetwork must be false for security"
+        },
+        "resources": {
+          "type": "object",
+          "required": ["requests"],
+          "properties": {
+            "requests": {
+              "type": "object",
+              "required": ["cpu", "memory"],
+              "properties": {
+                "cpu": {
+                  "type": "string",
+                  "pattern": "^[0-9]+(m|[0-9]*\\.?[0-9]+)?$"
+                },
+                "memory": {
+                  "type": "string",
+                  "pattern": "^[0-9]+(Mi|Gi|Ki)?$"
+                }
+              }
+            }
+          }
+        },
+        "encryptionSecret": {
+          "type": "object",
+          "properties": {
+            "secret": {
+              "type": "string",
+              "description": "Encryption secret must be at least 32 characters when provided"
+            },
+            "autoCreateSecret": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "ui": {
+      "type": "object",
+      "required": ["replicaCount", "resources"],
+      "properties": {
+        "replicaCount": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Number of UI replicas"
+        },
+        "resources": {
+          "type": "object",
+          "required": ["requests"],
+          "properties": {
+            "requests": {
+              "type": "object",
+              "required": ["cpu", "memory"],
+              "properties": {
+                "cpu": {
+                  "type": "string",
+                  "pattern": "^[0-9]+(m|[0-9]*\\.?[0-9]+)?$"
+                },
+                "memory": {
+                  "type": "string",
+                  "pattern": "^[0-9]+(Mi|Gi|Ki)?$"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "ingress": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "hostname": {
+          "type": "string",
+          "description": "Ingress hostname - should be a valid FQDN when enabled"
+        }
+      },
+      "if": {
+        "properties": {
+          "enabled": {
+            "const": true
+          }
+        }
+      },
+      "then": {
+        "required": ["hostname"],
+        "properties": {
+          "hostname": {
+            "pattern": "^([a-z0-9-]+\\.)*[a-z0-9-]+\\.[a-z]{2,}$|^localhost$"
+          }
+        }
+      }
+    },
+    "httpRoute": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable Gateway API HTTPRoute"
+        },
+        "gatewayName": {
+          "type": "string",
+          "description": "Name of the Gateway to attach to"
+        },
+        "gatewayNamespace": {
+          "type": "string",
+          "description": "Namespace of the Gateway (optional)"
+        },
+        "sectionName": {
+          "type": "string",
+          "description": "Listener/section name on the Gateway (optional)"
+        },
+        "hostnames": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^([a-z0-9-]+\\.)*[a-z0-9-]+\\.[a-z]{2,}$",
+            "description": "Valid hostname for HTTPRoute"
+          },
+          "description": "List of hostnames for the HTTPRoute"
+        },
+        "prefix": {
+          "type": "string",
+          "pattern": "^/.*$",
+          "description": "Path prefix (must start with /)"
+        },
+        "extraLabels": {
+          "type": "object"
+        },
+        "annotations": {
+          "type": "object"
+        }
+      },
+      "if": {
+        "properties": {
+          "enabled": {
+            "const": true
+          }
+        }
+      },
+      "then": {
+        "required": ["gatewayName"],
+        "properties": {
+          "gatewayName": {
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "networkPolicy": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "externalEgressCIDRs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^([0-9]{1,3}\\.){3}[0-9]{1,3}/[0-9]{1,2}$",
+            "description": "Must be valid CIDR notation"
+          }
+        },
+        "externalDatabaseCIDRs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^([0-9]{1,3}\\.){3}[0-9]{1,3}/[0-9]{1,2}$",
+            "description": "CIDR blocks for external database access"
+          }
+        }
+      }
+    },
+    "backup": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "schedule": {
+          "type": "string",
+          "pattern": "^(@(annually|yearly|monthly|weekly|daily|hourly|reboot))|(@every (\\d+(ns|us|µs|ms|s|m|h))+)|((((\\d+,)+\\d+|(\\d+([/-])\\d+)|\\d+|\\*) ?){5,7})$",
+          "description": "Cron schedule expression"
+        },
+        "retentionDays": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Number of days to retain backups"
+        },
+        "pvc": {
+          "type": "object",
+          "properties": {
+            "existingClaim": {
+              "type": "string",
+              "description": "Name of existing PVC for backups"
+            },
+            "storageClassName": {
+              "type": "string"
+            },
+            "size": {
+              "type": "string",
+              "pattern": "^[0-9]+(Mi|Gi|Ti)?$"
+            }
+          }
+        }
+      }
+    },
+    "serviceAccount": {
+      "type": "object",
+      "properties": {
+        "create": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "grafana": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable built-in Grafana instance"
+        },
+        "external": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "pattern": "^(https?://[^\\s]+)?$",
+              "description": "External Grafana URL (required when enabled=false with MySQL)"
+            }
+          }
+        },
+        "adminPassword": {
+          "type": "string",
+          "description": "Grafana admin password"
+        }
+      }
+    },
+    "imageTag": {
+      "type": "string",
+      "description": "Global image tag override"
+    },
+    "imagePullSecrets": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "description": "Image pull secrets"
+    },
+    "replicaCount": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Global replica count (deprecated - use lake.replicaCount and ui.replicaCount)"
+    }
+  }
+}

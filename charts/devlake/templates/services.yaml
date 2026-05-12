@@ -1,50 +1,52 @@
-#
-# Licensed to the Apache Software Foundation (ASF) under one or more
-# contributor license agreements.  See the NOTICE file distributed with
-# this work for additional information regarding copyright ownership.
-# The ASF licenses this file to You under the Apache License, Version 2.0
-# (the "License"); you may not use this file except in compliance with
-# the License.  You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-# database services
+{{/*
+Licensed to the Apache Software Foundation (ASF) under one or more
+contributor license agreements.  See the NOTICE file distributed with
+this work for additional information regarding copyright ownership.
+The ASF licenses this file to You under the Apache License, Version 2.0
+(the "License"); you may not use this file except in compliance with
+the License.  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+# database services (v2.0.0: refactored for database.type selector)
 ---
 
-{{- if eq .Values.option.database "mysql" }}
-{{- if not .Values.mysql.useExternal }}
+{{- if not .Values.database.useExternal }}
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "devlake.fullname" . }}-mysql
+  name: {{ include "devlake.fullname" . }}-{{ .Values.database.type }}
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "devlake.labels" . | nindent 4 }}
-    {{- with .Values.mysql.service.extraLabels }}
+    app.kubernetes.io/component: database
+    {{- with .Values.database.service.extraLabels }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
+  annotations:
+    {{- include "devlake.annotations" . | nindent 4 }}
 spec:
-  type: {{ .Values.mysql.service.type }}
-  {{- if and (eq .Values.mysql.service.type "LoadBalancer") .Values.mysql.service.loadBalancerIP }}
-  loadBalancerIP: {{ .Values.mysql.service.loadBalancerIP }}
+  type: {{ .Values.database.service.type }}
+  {{- if and (eq .Values.database.service.type "LoadBalancer") .Values.database.service.loadBalancerIP }}
+  loadBalancerIP: {{ .Values.database.service.loadBalancerIP }}
   {{- end }}
   selector:
     {{- include "devlake.selectorLabels" . | nindent 4 }}
-    devlakeComponent: mysql
+    devlakeComponent: {{ .Values.database.type }}
   ports:
     - protocol: TCP
-      name: mysql
-      port: 3306
-      targetPort: 3306
-      {{- if and (eq .Values.mysql.service.type "NodePort") .Values.mysql.service.nodePort }}
-      nodePort: {{ .Values.mysql.service.nodePort }}
+      name: {{ .Values.database.type }}
+      port: {{ include "database.port" . }}
+      targetPort: {{ include "database.port" . }}
+      {{- if and (eq .Values.database.service.type "NodePort") .Values.database.service.nodePort }}
+      nodePort: {{ .Values.database.service.nodePort }}
       {{- end }}
-{{- end }}
 {{- end }}
 # devlake services
 ---
@@ -52,10 +54,20 @@ apiVersion: v1
 kind: Service
 metadata:
   name: {{ include "devlake.fullname" . }}-lake
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "devlake.labels" . | nindent 4 }}
+    app.kubernetes.io/component: lake
+    devlakeComponent: lake
     {{- with .Values.lake.service.extraLabels }}
     {{- toYaml . | nindent 4 }}
+    {{- end }}
+  annotations:
+    {{- include "devlake.annotations" . | nindent 4 }}
+    {{- if .Values.metrics.enabled }}
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+    prometheus.io/path: "/metrics"
     {{- end }}
 spec:
   selector:
@@ -63,7 +75,7 @@ spec:
     devlakeComponent: lake
   ports:
     - protocol: TCP
-      name: devlake
+      name: http
       port: {{ .Values.lake.port }}
       targetPort: {{ .Values.lake.port }}
 
@@ -73,10 +85,20 @@ apiVersion: v1
 kind: Service
 metadata:
   name: {{ include "devlake.fullname" . }}-ui
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "devlake.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ui
+    devlakeComponent: ui
     {{- with .Values.ui.service.extraLabels }}
     {{- toYaml . | nindent 4 }}
+    {{- end }}
+  annotations:
+    {{- include "devlake.annotations" . | nindent 4 }}
+    {{- if .Values.metrics.enabled }}
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "4000"
+    prometheus.io/path: "/metrics"
     {{- end }}
 spec:
   type: {{ .Values.service.type }}
@@ -85,9 +107,6 @@ spec:
     devlakeComponent: ui
   ports:
     - protocol: TCP
-      name: ui
+      name: http
       port: 4000
       targetPort: 4000
-      {{- if eq .Values.service.type "NodePort" }}
-      nodePort: {{ .Values.service.uiPort }}
-      {{- end }}

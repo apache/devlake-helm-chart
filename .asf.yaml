@@ -19,7 +19,7 @@ github:
   features:
     issues: true
     projects: false
-    
+
   ghp_branch:  gh-pages
   ghp_path:    /
   enabled_merge_buttons:
@@ -40,7 +40,7 @@ github:
         required_approving_review_count: 1
   collaborators:
     - daniel-hutao
-    
+
 notifications:
   commits: commits@devlake.apache.org
   issues:  commits@devlake.apache.org

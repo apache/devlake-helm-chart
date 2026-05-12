@@ -17,115 +17,175 @@
 
 # replica count
 replicaCount: 1
-imageTag: v1.0.3-beta10
+imageTag: v1.0.3-beta12
 
 # image pull secrets
 imagePullSecrets: []
+
+# NetworkPolicy configuration
+networkPolicy:
+  enabled: false  # Production: set to true. See NOTES.txt for required egress config.
+  externalEgressCIDRs: []
+  # External database access CIDRs (required when database.useExternal=true and networkPolicy.enabled=true)
+  # Example: ["10.0.0.0/8"] or leave empty to allow all destinations (0.0.0.0/0)
+  externalDatabaseCIDRs: []
+  ui:
+    # Restrict UI ingress sources (optional)
+    # When not set, UI accepts traffic from all sources
+    ingressNamespaceSelector: {}
+    ingressPodSelector: {}
+
+# Optional SHA256 digests for image pinning
+imageDigests:
+  lake: ""
+  ui: ""
+  grafana: ""
+  database:
+    mysql: ""
+    postgresql: ""
+
+# ServiceAccount configuration for lake, ui, and grafana pods
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template with -sa suffix
+  name: ""
 
 #the common environments for all pods except grafana, grafana needs to be set in grafana section seperately
 commonEnvs:
   TZ: "UTC"
 
-mysql:
+# BREAKING CHANGE (v2.0.0): mysql.* has been replaced with database.*
+# Migration guide: https://github.com/apache/incubator-devlake-helm-chart/blob/main/MIGRATION.md
+#
+# Old (v1.x):          New (v2.0.0):
+# mysql.username    →  database.username
+# mysql.password    →  database.password
+# mysql.database    →  database.database
+# mysql.useExternal →  database.useExternal
+# mysql.rootPassword → database.mysql.rootPassword
+# mysql.extraParams →  database.mysql.extraParams
+#
+# You must also add: database.type: mysql (or postgresql)
+
+database:
+  # Database type selector - supported: mysql, postgresql
+  # REQUIRED FOR POSTGRESQL: Set type to 'postgresql'
+  type: mysql
+
   replicaCount: 1
-  # if use external mysql server, please set true
-  # by default using false, chart will create a single mysql instance
+
+  # if use external database server, please set true
+  # by default using false, chart will create a single database instance
   useExternal: false
 
-  # the external mysql server address
+  # the external database server address
   externalServer: 127.0.0.1
 
-  # external mysql port
+  # external database port (default: 3306 for mysql, 5432 for postgresql)
   externalPort: 3306
 
   # the username for devlake database
   username: merico
 
   # the password for devlake database
-  password: merico
+  # ⚠️ SECURITY WARNING: Never commit plaintext passwords to Git!
+  # For production, use externalSecrets.enabled=true or pass via --set
+  # Example: helm install --set database.password=$DB_PASSWORD
+  password: ""
 
-  # the database for devlake
+  # the database name for devlake
   database: lake
 
-  # extra MySQL DSN query params appended to DB_URL.
-  # Note: include a leading '&' yourself. Empty string means no change.
-  # example: "&tls=skip-verify" or "&tls=skip-verify&autocommit=true"
-  extraParams: ""
-
-  # root password for mysql, only used when use_external=false
-  rootPassword: admin
-
-  # storage for mysql
+  # storage for database (embedded mode only)
   storage:
     # pvc or hostpath
     type: pvc
     # the storage class for pv, leave empty will using default
     class: ""
     size: 50Gi
-    hostPath: /devlake/mysql/data
+    hostPath: /devlake/database/data
 
-  # image for mysql
+  # image for database (embedded mode only)
+  # defaults: mysql:8 for type=mysql, postgres:14 for type=postgresql
+  # Leave repository and tag empty to use type-driven defaults from _helpers.tpl
   image:
-    repository: mysql
-    tag: 8
+    repository: ""
+    tag: ""
     pullPolicy: IfNotPresent
 
-  # init containers for mysql if have
+  # init containers for database if have
   initContainers: []
 
-  # resources config for mysql if have
-  resources: {}
+  # resources config for database if have
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
 
-  # nodeSelector config for mysql if have
+  # nodeSelector config for database if have
   nodeSelector: {}
 
-  # tolerations config for mysql if have
+  # tolerations config for database if have
   tolerations: []
 
-  # affinity config for mysql if have
+  # affinity config for database if have
   affinity: {}
-
-  extraArgs: []
 
   extraLabels: {}
 
-  securityContext: {}
+  # Security context (runAsUser and fsGroup are computed based on database.type)
+  # mysql: uid=999, postgresql: uid=70
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
 
-  containerSecurityContext: {}
+  containerSecurityContext:
+    runAsNonRoot: true
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: ["ALL"]
 
   podAnnotations: {}
-
-  # Probes for MySQL container
-  startupProbe:
-    exec: &mysql_ping_exec
-      command:
-        - "sh"
-        - "-c"
-        - "mysqladmin ping --protocol=TCP -h 127.0.0.1 -u root -p$MYSQL_ROOT_PASSWORD"
-    initialDelaySeconds: 120
-    periodSeconds: 10
-    timeoutSeconds: 10
-    failureThreshold: 60
-
-  livenessProbe:
-    exec: *mysql_ping_exec
-    initialDelaySeconds: 60
-    periodSeconds: 10
-    timeoutSeconds: 30
-    failureThreshold: 5
-
-  readinessProbe:
-    exec: *mysql_ping_exec
-    initialDelaySeconds: 5
-    periodSeconds: 5
-    timeoutSeconds: 10
-    failureThreshold: 3
 
   service:
     type: "ClusterIP"
     nodePort: ""
     loadBalancerIP: ""
     extraLabels: {}
+
+  # MySQL-specific settings (only used when database.type: mysql)
+  mysql:
+    # root password for mysql, only used when useExternal=false
+    rootPassword: ""
+
+    # Enable root initContainer to fix permissions
+    # Set to false for Pod Security Standards "restricted" compliance
+    # When false, ensure PVC/volume permissions are correct (fsGroup may handle this)
+    enableFixPermissions: true
+
+    # extra MySQL DSN query params appended to DB_URL.
+    # Note: include a leading '&' yourself. Empty string means no change.
+    # example: "&tls=skip-verify" or "&tls=skip-verify&autocommit=true"
+    extraParams: ""
+
+  # PostgreSQL-specific settings (only used when database.type: postgresql)
+  postgresql:
+    # Enable root initContainer to fix permissions
+    # Set to false for Pod Security Standards "restricted" compliance
+    # When false, ensure PVC/volume permissions are correct (fsGroup may handle this)
+    enableFixPermissions: true
+
+    # extra PostgreSQL DSN query params appended to DB_URL.
+    # Note: must include a leading '?' for first param. Empty string means no change.
+    # example: "?sslmode=disable" or "?sslmode=disable&search_path=public"
+    extraParams: ""
 
 # dependency chart values
 grafana:
@@ -136,7 +196,11 @@ grafana:
   image:
     registry: devlake.docker.scarf.sh
     repository: apache/devlake-dashboard
-    tag: v1.0.3-beta10
+    tag: v1.0.3-beta12
+  serviceAccount:
+    create: false
+    nameOverride: "{{ include \"devlake.serviceAccountName\" . }}"
+  automountServiceAccountToken: false
   deploymentStrategy:
     type: Recreate
   adminPassword: ""
@@ -146,16 +210,38 @@ grafana:
       root_url: "%(protocol)s://%(domain)s/grafana"
   # the Secret name should be the same as .Values.option.connectionSecretName
   envFromSecrets:
-    - name: &devlake_mysql_auth "devlake-mysql-auth"
+    - name: &devlake_db_auth "devlake-db-auth"
   # the ConfigMap name should be the same as .Values.option.connectionConfigmapName
   envFromConfigMaps:
-    - name: &devlake_mysql_auth_config "devlake-mysql-auth-config"
+    - name: &devlake_db_auth_config "devlake-db-auth-config"
   #keep grafana timezone same as other pods, which is set by .Values.commonEnvs.TZ
   env:
     TZ: "UTC"
   persistence:
     enabled: true
     size: 4Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  testFramework:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 100m
+        memory: 64Mi
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 65534
+      readOnlyRootFilesystem: true
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: ["ALL"]
   ingressServiceName: ""
   ingressServicePort: ""
 
@@ -164,7 +250,7 @@ lake:
   revisionHistoryLimit: 10
   image:
     repository: devlake.docker.scarf.sh/apache/devlake
-    pullPolicy: Always
+    pullPolicy: IfNotPresent
     # defaults to imageTag; if set, lake.image.tag will override imageTag
     # tag:
   # storage for config
@@ -178,6 +264,7 @@ lake:
     LOGGING_DIR: "/app/logs"
     # debug, info, warn, error
     LOGGING_LEVEL: "info"
+    LOGGING_FORMAT: json
     JIRA_JQL_AUTO_FULL_REFRESH: "true"
     ##########################
     # ENABLE_SUBTASKS_BY_DEFAULT: This environment variable is used to enable or disable the execution of subtasks.
@@ -192,14 +279,20 @@ lake:
     # The name of secret which contains keys named ENCRYPTION_SECRET
     secretName: ""
     # if secretName is empty, secret should be set
-    # you can generate the encryption secret via cmd `openssl rand -base64 2000 | tr -dc 'A-Z' | fold -w 128 | head -n 1`
+    # ⚠️ SECURITY WARNING: Never commit encryption secrets to Git!
+    # For production, use externalSecrets.enabled=true or pass via --set
+    # Generate: openssl rand -base64 2000 | tr -dc 'A-Z' | fold -w 128 | head -n 1
+    # Example: helm install --set lake.encryptionSecret.secret=$ENCRYPTION_SECRET
     secret: ""
     autoCreateSecret: true
 
-  # If hostNetwork is true, then dnsPolicy is set to ClusterFirstWithHostNet
-  hostNetwork: false
-
-  resources: {}
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 2000m
+      memory: 2Gi
 
   strategy:
     type: Recreate
@@ -212,11 +305,28 @@ lake:
 
   extraLabels: {}
 
-  securityContext: {}
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
 
-  containerSecurityContext: {}
+  containerSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: ["ALL"]
 
-  initContainerSecurityContext: {}
+  initContainerSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: ["ALL"]
 
   podAnnotations: {}
 
@@ -265,20 +375,41 @@ lake:
   #     subPath: test_file.yaml
   volumeMounts: []
 
-  # Name of an existing ServiceAccount to use for the lake pod.
-  # If empty, the pod uses the namespace default ServiceAccount.
-  serviceAccount:
-    name: ""
+  # PodDisruptionBudget for high availability
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+
+  # HorizontalPodAutoscaler configuration
+  hpa:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+
+  # Pod Anti-Affinity configuration
+  podAntiAffinity:
+    enabled: false
+    type: preferred
+
+  # Topology spread constraints
+  topologySpreadConstraints: []
 
 ui:
   replicaCount: 1
   revisionHistoryLimit: 10
   image:
     repository: devlake.docker.scarf.sh/apache/devlake-config-ui
-    pullPolicy: Always
+    pullPolicy: IfNotPresent
     # defaults to imageTag; if set, lake.image.tag will override imageTag
     # tag:
-  resources: {}
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
 
   strategy: {}
 
@@ -313,7 +444,10 @@ ui:
   basicAuth:
     enabled: false
     user: admin
-    password: admin
+    # ⚠️ SECURITY WARNING: Never commit plaintext passwords to Git!
+    # For production, use externalSecrets.enabled=true or pass via --set
+    # Example: helm install --set ui.basicAuth.password=$UI_PASSWORD
+    password: ""
     autoCreateSecret: true
     secretName: ""
 
@@ -322,23 +456,23 @@ ui:
   podAnnotations: {}
 
   ## SecurityContext holds pod-level security attributes and common container settings.
-  ## This defaults to non root user with uid 101 and gid 1000. *v1.PodSecurityContext  false
   ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
   securityContext:
-    {}
-    # fsGroup: 101
-    # runAsGroup: 1000
-    # runAsNonRoot: true
-    # runAsUser: 101
+    runAsNonRoot: true
+    runAsUser: 1001
+    fsGroup: 1001
+    seccompProfile:
+      type: RuntimeDefault
 
   ## K8s containers' Security Context
   ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-container
   containerSecurityContext:
-    {}
-    # allowPrivilegeEscalation: false
-    # capabilities:
-    #   drop:
-    #       - all
+    runAsNonRoot: true
+    runAsUser: 1001
+    readOnlyRootFilesystem: false
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: ["ALL"]
 
   deployment:
     extraLabels: {}
@@ -349,10 +483,25 @@ ui:
   ## Side Contaainer Configuration
   extraContainers: []
 
-  # Name of an existing ServiceAccount to use for the config-ui pod.
-  # If empty, the pod uses the namespace default ServiceAccount.
-  serviceAccount:
-    name: ""
+  # PodDisruptionBudget for high availability
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+
+  # HorizontalPodAutoscaler configuration
+  hpa:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+
+  # Pod Anti-Affinity configuration
+  podAntiAffinity:
+    enabled: false
+    type: preferred
+
+  # Topology spread constraints
+  topologySpreadConstraints: []
 #  - name: vault-agent
 #    image: vault:1.6.2
 #    args:
@@ -374,11 +523,15 @@ alpine:
     tag: 3.16
     pullPolicy: IfNotPresent
 
+# Prometheus metrics configuration
+metrics:
+  enabled: false
+  serviceMonitor:
+    enabled: false
+
 service:
   # service type: NodePort/ClusterIP
-  type: NodePort
-  # node port for devlake-ui if NodePort is enabled
-  uiPort: 32001
+  type: ClusterIP
 
 ingress:
   enabled: false
@@ -412,6 +565,27 @@ ingress:
   httpPort: 80
   # ingress https port
   httpsPort: 443
+  # rate limiting for default nginx ingress controller
+  rateLimit: "100"
+
+# Gateway API HTTPRoute configuration
+httpRoute:
+  enabled: false
+  # Gateway name to attach to
+  gatewayName: ""
+  # Gateway namespace (if different from release namespace)
+  gatewayNamespace: ""
+  # Listener/section name on the Gateway
+  sectionName: ""
+  # Hostnames for the HTTPRoute
+  hostnames: []
+  #  - devlake.example.com
+  # Path prefix
+  prefix: /
+  # Extra labels
+  extraLabels: {}
+  # Annotations
+  annotations: {}
 
   extraPaths: []
 #  extraPaths:
@@ -424,18 +598,32 @@ ingress:
 #            name: use-annotation
 
 option:
-  # database type, supported: [mysql]
-  database: mysql
-  # the existing k8s secret name of db connection auth. The secret name should be as same as .Values.grafana.envFromSecret
-  connectionSecretName: *devlake_mysql_auth
+  # DEPRECATED (v2.0.0): option.database removed - use database.type instead
+  # database type now controlled by database.type field above
+
+  # the existing k8s secret name of db connection auth
+  connectionSecretName: *devlake_db_auth
   # Optional: override the ConfigMap name for non-sensitive DB envs used across components
   # Default is a fixed name to align references from subcharts
-  connectionConfigmapName: *devlake_mysql_auth_config
+  connectionConfigmapName: *devlake_db_auth_config
   autoCreateSecret: true
-  # If true, the chart assembles DB_URL automatically for MySQL. Set to false
+  # If true, the chart assembles DB_URL automatically. Set to false
   # to disable auto-assembly and provide DB_URL yourself via `lake.envs` or
   # an external secret referenced by `lake.extraEnvsFromSecret`.
   assembleDbUrl: true
+
+# External Secrets Operator integration
+externalSecrets:
+  enabled: false
+  secretStoreRef:
+    name: ""
+    kind: SecretStore
+  secretName: ""
+  remoteRefs:
+    dbPassword: ""
+    dbRootPassword: ""
+    encryptionSecret: ""
+    uiPassword: ""
 
 # Define some extra resources to be created
 # This section is useful when you need ExternalResource or Secrets, etc.
@@ -449,3 +637,27 @@ extraResources: []
   #   stringData:
   #     username: admin
   #     password: mypassword
+
+# Database backup configuration (CronJob)
+backup:
+  enabled: false
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  backoffLimit: 2
+  retentionDays: 7
+  image:
+    # Image for MySQL backups (used when database.type=mysql)
+    repository: mysql
+    tag: "8"
+    # Image tag for PostgreSQL backups (used when database.type=postgresql)
+    # Uses postgres:<postgresTag>
+    postgresTag: "14"
+    pullPolicy: IfNotPresent
+  pvc:
+    # Use existing PVC (leave empty to create new PVC with name: <fullname>-backup)
+    existingClaim: ""
+    # Storage class for backup PVC (leave empty for default)
+    storageClassName: ""
+    # Storage size for backup PVC
+    size: 10Gi

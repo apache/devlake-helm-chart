@@ -1,0 +1,108 @@
+{{/*
+Licensed to the Apache Software Foundation (ASF) under one or more
+contributor license agreements.  See the NOTICE file distributed with
+this work for additional information regarding copyright ownership.
+The ASF licenses this file to You under the Apache License, Version 2.0
+(the "License"); you may not use this file except in compliance with
+the License.  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+{{- if .Values.backup.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "devlake.fullname" . }}-backup
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "devlake.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backup
+  annotations:
+    {{- include "devlake.annotations" . | nindent 4 }}
+spec:
+  schedule: "{{ .Values.backup.schedule }}"
+  successfulJobsHistoryLimit: {{ .Values.backup.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.backup.failedJobsHistoryLimit }}
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: {{ .Values.backup.backoffLimit }}
+      template:
+        metadata:
+          labels:
+            {{- include "devlake.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: backup
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: {{ include "devlake.serviceAccountName" . }}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            fsGroup: 65534
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+          - name: backup
+            {{- if eq .Values.database.type "mysql" }}
+            image: "{{ .Values.backup.image.repository }}:{{ .Values.backup.image.tag }}"
+            {{- else if eq .Values.database.type "postgresql" }}
+            image: "postgres:{{ .Values.backup.image.postgresTag | default "14" }}"
+            {{- end }}
+            imagePullPolicy: {{ .Values.backup.image.pullPolicy }}
+            securityContext:
+              readOnlyRootFilesystem: true
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop:
+                - ALL
+            envFrom:
+              - configMapRef:
+                  name: {{ include "devlake.db.configmap" . }}
+              - secretRef:
+                  name: {{ include "devlake.db.secret" . }}
+            command:
+            - sh
+            - -c
+            - |
+              set -e
+              TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+              BACKUP_FILE="/backup/devlake-${TIMESTAMP}.sql.gz"
+
+              echo "Starting backup at ${TIMESTAMP}..."
+
+              {{- if eq .Values.database.type "mysql" }}
+              mysqldump -h"${MYSQL_SERVER}" -P"${MYSQL_PORT}" -u"${MYSQL_USER}" -p"${MYSQL_PASSWORD}" "${MYSQL_DATABASE}" \
+                --single-transaction --quick --lock-tables=false | gzip > "${BACKUP_FILE}"
+              {{- else if eq .Values.database.type "postgresql" }}
+              PGPASSWORD="${DB_PASSWORD}" pg_dump -h "${DB_SERVER}" -p "${DB_PORT}" -U "${DB_USER}" "${DB_DATABASE}" \
+                --no-owner --no-acl | gzip > "${BACKUP_FILE}"
+              {{- end }}
+
+              echo "Backup completed: ${BACKUP_FILE}"
+              ls -lh "${BACKUP_FILE}"
+
+              # Retention: delete backups older than specified days
+              {{- if .Values.backup.retentionDays }}
+              echo "Cleaning backups older than {{ .Values.backup.retentionDays }} days..."
+              find /backup -name "devlake-*.sql.gz" -type f -mtime +{{ .Values.backup.retentionDays }} -delete
+              {{- end }}
+
+              echo "Backup job finished successfully"
+            volumeMounts:
+              - name: backup
+                mountPath: /backup
+              - name: tmp
+                mountPath: /tmp
+          volumes:
+            - name: backup
+              persistentVolumeClaim:
+                claimName: {{ .Values.backup.pvc.existingClaim | default (printf "%s-backup" (include "devlake.fullname" .)) }}
+            - name: tmp
+              emptyDir: {}
+{{- end }}

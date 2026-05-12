@@ -1,3 +1,20 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
 name: Release Charts
 
 on:
@@ -13,15 +30,19 @@ on:
 permissions:
   contents: write
   packages: write
+  id-token: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
   release:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          submodules: recursive
           fetch-depth: 0
 
       - name: Configure Git
@@ -30,28 +51,56 @@ jobs:
           git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
 
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install Helm
-        run: |
-          echo "installing helm 3..."
-          curl -sSL https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+      - name: Install mise
+        uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4
+
+      - name: Install tools via mise
+        run: mise install
 
       - name: Add repositories
         run: |
           helm repo add grafana https://grafana.github.io/helm-charts
 
       - name: Run chart-releaser
-        uses: ./.github/actions/chart-releaser-action
+        uses: helm/chart-releaser-action@a0d2dc62c5e491af8ef6ba64a2e02bcf3fb33aa1 # v1.7.0
         with:
           charts_dir: charts
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
           CR_SKIP_EXISTING: false
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@61119d458adab75f756bc0b9e4bde25725f86a7a # v0.17.2
+        continue-on-error: true
+        with:
+          path: charts/devlake
+          format: spdx-json
+          output-file: devlake-sbom.spdx.json
+
+      - name: Upload SBOM to release
+        continue-on-error: true
+        run: |
+          if [ -f devlake-sbom.spdx.json ]; then
+            for pkg in .cr-release-packages/*; do
+              if [ -z "${pkg:-}" ]; then
+                break
+              fi
+              TAG=$(basename "$pkg" | sed 's/.*-\([0-9].*\)\.tgz/\1/')
+              gh release upload "devlake-${TAG}" devlake-sbom.spdx.json --clobber || true
+            done
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@dc72c7d5c4d10cd6bcb8cf6e3fd625a9e5e537da # v3.7.0
+        continue-on-error: true
 
       - name: Push Chart to GHCR
         run: |
@@ -61,3 +110,21 @@ jobs:
             fi
             helm push "${pkg}" oci://ghcr.io/${{ github.repository }}
           done
+
+      - name: Sign chart with cosign
+        continue-on-error: true
+        run: |
+          for pkg in .cr-release-packages/*; do
+            if [ -z "${pkg:-}" ]; then
+              break
+            fi
+            CHART_NAME=$(basename "$pkg" | sed 's/-[0-9].*//')
+            TAG=$(basename "$pkg" | sed 's/.*-\([0-9].*\)\.tgz/\1/')
+            cosign sign --yes "ghcr.io/${{ github.repository }}/${CHART_NAME}:${TAG}" || true
+          done
+
+      - name: Generate SLSA provenance
+        uses: actions/attest-build-provenance@1c608d11d69870c2092266b3f9a6f3abbf17002c # v1.4.3
+        continue-on-error: true
+        with:
+          subject-path: '.cr-release-packages/*.tgz'

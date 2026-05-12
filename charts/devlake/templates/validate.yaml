@@ -1,21 +1,64 @@
-{{- if and .Values.lake.encryptionSecret.autoCreateSecret (not .Values.lake.encryptionSecret.secret) }}
+{{/*
+Licensed to the Apache Software Foundation (ASF) under one or more
+contributor license agreements.  See the NOTICE file distributed with
+this work for additional information regarding copyright ownership.
+The ASF licenses this file to You under the Apache License, Version 2.0
+(the "License"); you may not use this file except in compliance with
+the License.  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+
+{{- if and (not .Values.externalSecrets.enabled) .Values.lake.encryptionSecret.autoCreateSecret (not .Values.lake.encryptionSecret.secret) }}
 {{- fail
 "Helm test requires lake.encryptionSecret.secret.\n\n  - If you're upgrading from DevLake v0.17.x or earlier versions, please get the encryption secret by copying the ENCODE_KEY value from /app/config/.env of the lake pod (e.g. devlake-lake-0);\n  - If upgrading from v0.18.0+, get the original secret in k8s secret and decode it\n  - If new installation, get the encryption secret via command `openssl rand -base64 2000 | tr -dc 'A-Z' | fold -w 128 | head -n 1`.\n\nFor more information, please check https://github.com/apache/incubator-devlake-helm-chart"
 }}
 {{- end }}
 
-{{- if and .Values.ui.basicAuth.enabled .Values.ui.basicAuth.autoCreateSecret (or (not .Values.ui.basicAuth.user) (not .Values.ui.basicAuth.password)) }}
+{{- if and (not .Values.externalSecrets.enabled) .Values.ui.basicAuth.enabled .Values.ui.basicAuth.autoCreateSecret (or (not .Values.ui.basicAuth.user) (not .Values.ui.basicAuth.password)) }}
 {{- fail "Helm test requires ui.basicAuth.user and ui.basicAuth.password" }}
 {{- end }}
 
-{{- if and (eq .Values.option.database "mysql") .Values.option.autoCreateSecret (or (not .Values.mysql.username) (not .Values.mysql.password) (not .Values.mysql.database)) }}
-{{- fail "Helm test requires mysql.username, mysql.password and mysql.database" }}
+{{- if not (has .Values.database.type (list "mysql" "postgresql")) }}
+{{- fail "database.type must be 'mysql' or 'postgresql'" }}
 {{- end }}
 
-{{- if and .Values.option.autoCreateSecret (eq .Values.option.database "mysql") (not .Values.mysql.useExternal) (not .Values.mysql.rootPassword) }}
-{{- fail "Helm test requires mysql.rootPassword" }}
+{{- if and (not .Values.externalSecrets.enabled) .Values.option.autoCreateSecret (or (not .Values.database.username) (not .Values.database.password) (not .Values.database.database)) }}
+{{- fail "Helm test requires database.username, database.password and database.database" }}
 {{- end }}
 
-{{- if and (not .Values.grafana.enabled) (not .Values.grafana.external.url) }}
-{{- fail "Helm test requires grafana.enabled to be true or grafana.external.url to be provided" }}
+{{- if and (not .Values.externalSecrets.enabled) .Values.option.autoCreateSecret (eq .Values.database.type "mysql") (not .Values.database.useExternal) (not .Values.database.mysql.rootPassword) }}
+{{- fail "Helm test requires database.mysql.rootPassword when using embedded MySQL" }}
+{{- end }}
+
+{{- if and .Values.database.useExternal (or (not .Values.database.externalServer) (eq .Values.database.externalServer "127.0.0.1")) }}
+{{- fail "database.externalServer must be set to a valid hostname/IP when database.useExternal=true" }}
+{{- end }}
+
+{{- if and .Values.backup.enabled .Values.database.useExternal }}
+{{- fail "backup.enabled=true is not supported with database.useExternal=true. Backups must be configured on the external database server directly." }}
+{{- end }}
+
+{{- if and (not .Values.grafana.enabled) (or (not .Values.grafana.external.url) (eq .Values.grafana.external.url "")) }}
+{{- fail "When grafana.enabled=false, grafana.external.url must be set to a valid Grafana endpoint URL (e.g., http://grafana.example.com). Alternatively, set grafana.enabled=true to use the built-in Grafana instance." }}
+{{- end }}
+
+{{- if or (not .Values.lake.resources.requests) (not .Values.lake.resources.requests.cpu) (not .Values.lake.resources.requests.memory) }}
+{{- fail "lake.resources.requests with cpu and memory is required. Set cpu and memory requests for production deployments (e.g., requests: { cpu: 500m, memory: 512Mi })" }}
+{{- end }}
+
+{{- if or (not .Values.ui.resources.requests) (not .Values.ui.resources.requests.cpu) (not .Values.ui.resources.requests.memory) }}
+{{- fail "ui.resources.requests with cpu and memory is required. Set cpu and memory requests for production deployments (e.g., requests: { cpu: 100m, memory: 128Mi })" }}
+{{- end }}
+
+{{- if not .Values.database.useExternal }}
+{{- if or (not .Values.database.resources.requests) (not .Values.database.resources.requests.cpu) (not .Values.database.resources.requests.memory) }}
+{{- fail "database.resources.requests with cpu and memory is required when using embedded database. Set cpu and memory requests (e.g., requests: { cpu: 500m, memory: 1Gi })" }}
+{{- end }}
 {{- end }}

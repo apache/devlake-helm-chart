@@ -15,30 +15,24 @@
 # limitations under the License.
 #
 
-name: yaml-lint
+name: License Check
+
 on:
-  push:
-    branches:
-      - main
   pull_request:
 
 permissions:
   contents: read
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  helm-lint:
-    name: lint for helm chart
+  license-header-check:
+    name: Apache License Header Validation
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v6.0.2
 
-      - name: Setup environment
-        uses: ./.github/actions/setup-environment
-
-      - name: lint helm chart
-        run: helm lint charts/devlake --strict
+      - name: Check License Headers
+        uses: apache/skywalking-eyes/header@v0.8.0
+        with:
+          mode: check
+          config: .github/.licenserc.yaml

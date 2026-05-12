@@ -1,0 +1,39 @@
+name: Setup DevLake Environment
+description: Sets up mise, Helm, and chart dependencies for DevLake workflows
+
+inputs:
+  charts_dir:
+    description: 'Path to charts directory'
+    required: false
+    default: 'charts/devlake'
+
+runs:
+  using: composite
+  steps:
+    - name: Install mise
+      uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4
+
+    - name: Install tools via mise
+      run: mise install
+      shell: bash
+
+    - name: Cache Helm dependencies
+      uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4
+      with:
+        path: |
+          ~/.cache/helm
+          ${{ inputs.charts_dir }}/charts/
+        key: helm-deps-${{ hashFiles(format('{0}/Chart.lock', inputs.charts_dir)) }}
+        restore-keys: |
+          helm-deps-
+
+    - name: Add Helm repositories
+      run: |
+        helm repo add grafana https://grafana.github.io/helm-charts
+        helm repo update
+      shell: bash
+
+    - name: Build chart dependencies
+      run: |
+        helm dependency build ${{ inputs.charts_dir }}
+      shell: bash

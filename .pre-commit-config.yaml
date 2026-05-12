@@ -1,0 +1,75 @@
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: ['--unsafe']  # Allow custom YAML tags in Helm templates
+        exclude: ^charts/.*/templates/.*\.yaml$  # Skip Helm templates (contain Go template syntax)
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+      - id: check-merge-conflict
+      - id: detect-private-key
+
+  - repo: https://github.com/sirosen/texthooks
+    rev: 0.7.1
+    hooks:
+      - id: fix-smartquotes
+      - id: fix-ligatures
+
+  - repo: https://github.com/jumanjihouse/pre-commit-hooks
+    rev: 3.0.0
+    hooks:
+      - id: shellcheck
+        args: ['--severity=warning']
+
+  - repo: https://github.com/trufflesecurity/trufflehog
+    rev: v3.87.2
+    hooks:
+      - id: trufflehog
+        name: TruffleHog secret scan
+        entry: trufflehog filesystem --no-update --fail
+        args: ['--only-verified', '.']
+        language: golang
+        pass_filenames: false
+
+  - repo: https://github.com/gruntwork-io/pre-commit
+    rev: v0.1.24
+    hooks:
+      - id: helmlint
+
+
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.4
+    hooks:
+      - id: actionlint
+
+  - repo: local
+    hooks:
+      - id: helm-docs
+        name: Helm Docs
+        entry: bash -c 'mise exec -- helm-docs --chart-search-root=charts'
+        language: system
+        pass_filenames: false
+        files: (Chart\.yaml|values\.yaml|README\.md)$
+      - id: apache-license-check
+        name: Apache License Header Check
+        entry: bash -c 'docker run --rm -v "$PWD:/github/workspace" apache/skywalking-eyes:latest header check'
+        language: system
+        pass_filenames: false
+        always_run: true
+
+ci:
+  autofix_commit_msg: |
+    [pre-commit.ci] auto fixes from pre-commit hooks
+
+    for more information, see https://pre-commit.ci
+  autofix_prs: true
+  autoupdate_branch: ''
+  autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
+  autoupdate_schedule: weekly
+  skip: []
+  submodules: false

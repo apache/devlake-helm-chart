@@ -32,54 +32,160 @@ on:
       - "!**.md"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   deploy-with-helm:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        database_type: ["mysql-builtin", "mysql-external"]
+        database_type: ["mysql-builtin", "mysql-external", "postgresql-builtin", "postgresql-external"]
     steps:
-      - name: Creating kind cluster
-        uses: container-tools/kind-action@v1
-
-      - name: Cluster information
-        run: |
-          kubectl cluster-info
-          kubectl get nodes
-          kubectl get pods -n kube-system
-          helm version
-          kubectl version
-          kubectl get storageclasses
-
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v6.0.2
 
-      - name: Helm install devlake
+      - name: Setup environment
+        uses: ./.github/actions/setup-environment
+
+      - name: Create kind cluster
+        uses: ./.github/actions/kind-cluster
+        with:
+          cluster_name: devlake-${{ matrix.database_type }}
+
+      - name: Install external MySQL
         if: matrix.database_type == 'mysql-external'
         run: |
-          helm repo add bitnami https://charts.bitnami.com/bitnami
-          helm repo add grafana https://grafana.github.io/helm-charts
-          helm install mysql bitnami/mysql --version 9.19.1 --set auth.rootPassword=admin --set auth.database=lake --set auth.username=merico --set auth.password=merico
-          # external mysql at service: mysql
-          helm dep build charts/devlake
+          DB_ROOT_PASSWORD=$(openssl rand -base64 16)
+          DB_PASSWORD=$(openssl rand -base64 16)
+          echo "::add-mask::${DB_ROOT_PASSWORD}"
+          echo "::add-mask::${DB_PASSWORD}"
+
+          # Retry logic for helm repo add (network flakiness)
+          for i in {1..3}; do
+            if helm repo add bitnami https://charts.bitnami.com/bitnami; then
+              break
+            else
+              sleep $((2**i))
+            fi
+          done
+
+          helm install mysql bitnami/mysql --version 9.19.1 \
+            --set auth.rootPassword="${DB_ROOT_PASSWORD}" \
+            --set auth.database=lake \
+            --set auth.username=devlake \
+            --set auth.password="${DB_PASSWORD}"
+
+      - name: Install external PostgreSQL
+        if: matrix.database_type == 'postgresql-external'
+        run: |
+          DB_ROOT_PASSWORD=$(openssl rand -base64 16)
+          DB_PASSWORD=$(openssl rand -base64 16)
+          echo "::add-mask::${DB_ROOT_PASSWORD}"
+          echo "::add-mask::${DB_PASSWORD}"
+
+          # Retry logic for helm repo add (network flakiness)
+          for i in {1..3}; do
+            if helm repo add bitnami https://charts.bitnami.com/bitnami; then
+              break
+            else
+              sleep $((2**i))
+            fi
+          done
+
+          helm install postgresql bitnami/postgresql --version 12.12.10 \
+            --set auth.postgresPassword="${DB_ROOT_PASSWORD}" \
+            --set auth.database=lake \
+            --set auth.username=devlake \
+            --set auth.password="${DB_PASSWORD}"
+
+      - name: Install DevLake (MySQL external)
+        if: matrix.database_type == 'mysql-external'
+        run: |
+          DB_PASSWORD=$(openssl rand -base64 16)
+          ENCRYPTION_SECRET=$(openssl rand -base64 2000 | tr -dc '[:upper:]' | fold -w 128 | head -n 1)
+          echo "::add-mask::${DB_PASSWORD}"
+          echo "::add-mask::${ENCRYPTION_SECRET}"
+          NODE_IP=$(kubectl get nodes --namespace default -o jsonpath="{.items[0].status.addresses[0].address}")
+          echo "Node IP: ${NODE_IP}"
           helm install --debug --wait --timeout 2400s deploy-test charts/devlake \
             --set service.uiPort=30000 \
-            --set mysql.useExternal=true \
-            --set mysql.externalServer=mysql \
-            --set lake.encryptionSecret.secret=$(openssl rand -base64 2000 | tr -dc 'A-Z' | fold -w 128 | head -n 1)
+            --set database.type=mysql \
+            --set database.useExternal=true \
+            --set database.externalServer=mysql \
+            --set database.externalPort=3306 \
+            --set database.username=devlake \
+            --set database.password="${DB_PASSWORD}" \
+            --set database.database=lake \
+            --set lake.encryptionSecret.secret="${ENCRYPTION_SECRET}"
 
-      - name: Helm install devlake
+      - name: Install DevLake (MySQL builtin)
         if: matrix.database_type == 'mysql-builtin'
         run: |
-          helm repo add grafana https://grafana.github.io/helm-charts
-          helm dep build charts/devlake
-          export NODE_IP=$(kubectl get nodes --namespace default -o jsonpath="{.items[0].status.addresses[0].address}")
-          echo Node IP: ${NODE_IP}
+          DB_ROOT_PASSWORD=$(openssl rand -base64 16)
+          DB_PASSWORD=$(openssl rand -base64 16)
+          ENCRYPTION_SECRET=$(openssl rand -base64 2000 | tr -dc '[:upper:]' | fold -w 128 | head -n 1)
+          echo "::add-mask::${DB_ROOT_PASSWORD}"
+          echo "::add-mask::${DB_PASSWORD}"
+          echo "::add-mask::${ENCRYPTION_SECRET}"
+          NODE_IP=$(kubectl get nodes --namespace default -o jsonpath="{.items[0].status.addresses[0].address}")
+          echo "Node IP: ${NODE_IP}"
           helm install --debug --wait --timeout 2400s deploy-test charts/devlake \
             --set service.uiPort=30000 \
-            --set mysql.image.tag=8-debian \
-            --set lake.encryptionSecret.secret=$(openssl rand -base64 2000 | tr -dc 'A-Z' | fold -w 128 | head -n 1)
+            --set database.type=mysql \
+            --set database.useExternal=false \
+            --set database.username=devlake \
+            --set database.password="${DB_PASSWORD}" \
+            --set database.database=lake \
+            --set database.mysql.rootPassword="${DB_ROOT_PASSWORD}" \
+            --set database.image.tag=8-debian \
+            --set lake.encryptionSecret.secret="${ENCRYPTION_SECRET}"
+
+      - name: Install DevLake (PostgreSQL external)
+        if: matrix.database_type == 'postgresql-external'
+        run: |
+          DB_PASSWORD=$(openssl rand -base64 16)
+          ENCRYPTION_SECRET=$(openssl rand -base64 2000 | tr -dc '[:upper:]' | fold -w 128 | head -n 1)
+          echo "::add-mask::${DB_PASSWORD}"
+          echo "::add-mask::${ENCRYPTION_SECRET}"
+          NODE_IP=$(kubectl get nodes --namespace default -o jsonpath="{.items[0].status.addresses[0].address}")
+          echo "Node IP: ${NODE_IP}"
+          helm install --debug --wait --timeout 2400s deploy-test charts/devlake \
+            --set service.uiPort=30000 \
+            --set database.type=postgresql \
+            --set database.useExternal=true \
+            --set database.externalServer=postgresql \
+            --set database.externalPort=5432 \
+            --set database.username=devlake \
+            --set database.password="${DB_PASSWORD}" \
+            --set database.database=lake \
+            --set grafana.enabled=false \
+            --set lake.encryptionSecret.secret="${ENCRYPTION_SECRET}"
+
+      - name: Install DevLake (PostgreSQL builtin)
+        if: matrix.database_type == 'postgresql-builtin'
+        run: |
+          DB_PASSWORD=$(openssl rand -base64 16)
+          ENCRYPTION_SECRET=$(openssl rand -base64 2000 | tr -dc '[:upper:]' | fold -w 128 | head -n 1)
+          echo "::add-mask::${DB_PASSWORD}"
+          echo "::add-mask::${ENCRYPTION_SECRET}"
+          NODE_IP=$(kubectl get nodes --namespace default -o jsonpath="{.items[0].status.addresses[0].address}")
+          echo "Node IP: ${NODE_IP}"
+          helm install --debug --wait --timeout 2400s deploy-test charts/devlake \
+            --set service.uiPort=30000 \
+            --set database.type=postgresql \
+            --set database.useExternal=false \
+            --set database.username=devlake \
+            --set database.password="${DB_PASSWORD}" \
+            --set database.database=lake \
+            --set grafana.enabled=false \
+            --set lake.encryptionSecret.secret="${ENCRYPTION_SECRET}"
 
       - name: List cluster resources
         if: ${{ always() }}
@@ -91,36 +197,37 @@ jobs:
           kubectl get secrets
           kubectl get pvc
 
-      # TODO: using some e2e test code to replace it
-      - name: Curl with endpoints
+      - name: Run E2E smoke tests
+        run: .github/scripts/e2e-smoke-test.sh
+
+      - name: Dump diagnostics on failure
+        if: failure()
         run: |
-          export NODE_IP=$(kubectl get nodes --namespace default -o jsonpath="{.items[0].status.addresses[0].address}")
-          failed=0
-          for retry in {1..10} ; do
-            failed=0
-            # home
-            curl --fail http://${NODE_IP}:30000 || failed=1
-            # API for devlake
-            curl --fail http://${NODE_IP}:30000/api/blueprints || failed=1
-            # API for grafana
-            curl --fail http://${NODE_IP}:30000/grafana/api/health || failed=1
-            if [ $failed -eq 0 ] ; then
-              break
-            else
-              sleep 3
-            fi
+          echo "=== Helm status for release ==="
+          helm status deploy-test || true
+          echo "=== Kubernetes resources (all) ==="
+          kubectl get all -o wide || true
+          echo "=== Kubernetes events (latest 200) ==="
+          kubectl get events --sort-by=.lastTimestamp | tail -n 200 || true
+          echo "=== Describe deployments/statefulsets ==="
+          kubectl describe deploy || true
+          kubectl describe statefulset || true
+          echo "=== Describe pods ==="
+          kubectl describe pods || true
+          echo "=== Logs from all pods (current and previous, last 200 lines) ==="
+          for pod in $(kubectl get pods -o jsonpath='{.items[*].metadata.name}'); do
+            echo "----- logs for ${pod} -----"
+            kubectl logs "$pod" --all-containers --tail=200 || true
+            echo "----- previous logs for ${pod} -----"
+            kubectl logs "$pod" --all-containers --previous --tail=200 || true
           done
-          if [ $failed -ne 0 ] ; then
-            echo 'Test apis failed, please check logs from the PODS'
-            exit 1
-          fi
 
       - name: Show logs for pods
         if: ${{ always() }}
         run: |
           for pod in $(kubectl get pods -o jsonpath='{.items[*].metadata.name}') ; do
-            echo describe for $pod
-            kubectl describe pod $pod
-            echo logs for $pod
-            kubectl logs $pod || echo ""
+            echo "describe for ${pod}"
+            kubectl describe pod "$pod"
+            echo "logs for ${pod}"
+            kubectl logs "$pod" || echo ""
           done

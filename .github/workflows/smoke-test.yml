@@ -1,64 +1,98 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
 name: DevLake Helm Smoke Test
 
 on:
   push:
-    branches: [ "**" ]
+    branches: ["**"]
   pull_request:
-    branches: [ "**" ]
+    branches: ["**"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   smoke-test:
-    name: Smoke Test
+    name: Smoke Test (${{ matrix.database }})
     runs-on: ubuntu-latest
     timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      matrix:
+        database: [mysql, postgresql]
     env:
-      RELEASE_NAME: devlake
-      NAMESPACE: devlake
+      RELEASE_NAME: devlake-${{ matrix.database }}
+      NAMESPACE: devlake-${{ matrix.database }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6.0.2
 
-      - name: Set up kubectl
-        run: |
-          KVER="$(curl -sL https://dl.k8s.io/release/stable.txt)"
-          curl -L -o kubectl "https://dl.k8s.io/release/${KVER}/bin/linux/amd64/kubectl"
-          chmod +x kubectl && sudo mv kubectl /usr/local/bin/
+      - name: Setup environment
+        uses: ./.github/actions/setup-environment
 
-      - name: Set up Helm
-        run: |
-          HELM_VER="v3.18.6"
-          curl -L "https://get.helm.sh/helm-${HELM_VER}-linux-amd64.tar.gz" | tar xz
-          sudo mv linux-amd64/helm /usr/local/bin/helm
-
-      - name: Set up kind
-        run: |
-          KIND_VER="v0.30.0"
-          curl -L -o kind "https://kind.sigs.k8s.io/dl/${KIND_VER}/kind-linux-amd64"
-          chmod +x kind && sudo mv kind /usr/local/bin/kind
-
-      - name: Create cluster
-        run: |
-          kind create cluster --name devlake-smoke-test
-
-      - name: Add Helm repos
-        run: |
-          helm repo add grafana https://grafana.github.io/helm-charts
-          helm repo update
-
-      - name: Build chart dependencies
-        run: |
-          helm dependency build charts/devlake
+      - name: Create kind cluster
+        uses: ./.github/actions/kind-cluster
+        with:
+          cluster_name: devlake-${{ matrix.database }}
+          namespace: devlake-${{ matrix.database }}
 
       - name: Install DevLake chart
         run: |
           kubectl get events -n "$NAMESPACE" -w &
+          EVENTS_PID=$!
           kubectl get pods -n "$NAMESPACE" -w &
-          ENCRYPTION_SECRET=$(openssl rand -base64 2000 | tr -dc 'A-Z' | fold -w 128 | head -n 1)
+          PODS_PID=$!
+          trap 'kill $EVENTS_PID $PODS_PID 2>/dev/null || true' EXIT
+
+          ENCRYPTION_SECRET=$(openssl rand -base64 2000 | tr -dc '[:upper:]' | fold -w 128 | head -n 1)
+          DB_PASSWORD=$(openssl rand -base64 32)
+          DB_ROOT_PASSWORD=$(openssl rand -base64 32)
+          echo "::add-mask::${ENCRYPTION_SECRET}"
+          echo "::add-mask::${DB_PASSWORD}"
+          echo "::add-mask::${DB_ROOT_PASSWORD}"
+
           helm install "$RELEASE_NAME" ./charts/devlake \
             --namespace "$NAMESPACE" \
             --create-namespace \
-            --wait \
-            --set lake.encryptionSecret.secret="${ENCRYPTION_SECRET}"
+            --timeout 10m \
+            --set database.type="${{ matrix.database }}" \
+            --set lake.encryptionSecret.secret="${ENCRYPTION_SECRET}" \
+            --set database.password="${DB_PASSWORD}" \
+            --set database.mysql.rootPassword="${DB_ROOT_PASSWORD}"
+
+          # Wait specifically for database pod (not full application stack)
+          echo "Waiting for ${{ matrix.database }} database pod to be ready..."
+          kubectl wait --for=condition=ready pod \
+            -l "devlakeComponent=${{ matrix.database }}" \
+            -n "$NAMESPACE" \
+            --timeout=5m
+
+      - name: Run database smoke test
+        run: |
+          if [ "${{ matrix.database }}" = "mysql" ]; then
+            .github/scripts/mysql-smoke-test.sh
+          elif [ "${{ matrix.database }}" = "postgresql" ]; then
+            .github/scripts/postgresql-smoke-test.sh
+          fi
 
       - name: Dump diagnostics on failure
         if: failure()

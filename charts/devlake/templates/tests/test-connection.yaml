@@ -1,0 +1,109 @@
+{{/*
+Licensed to the Apache Software Foundation (ASF) under one or more
+contributor license agreements.  See the NOTICE file distributed with
+this work for additional information regarding copyright ownership.
+The ASF licenses this file to You under the Apache License, Version 2.0
+(the "License"); you may not use this file except in compliance with
+the License.  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "devlake.fullname" . }}-test-connection
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "devlake.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  serviceAccountName: {{ include "devlake.serviceAccountName" . }}
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65534
+    seccompProfile:
+      type: RuntimeDefault
+  initContainers:
+    - name: test-database
+      {{- if not .Values.database.useExternal }}
+      image: {{ include "database.image" . }}
+      {{- else }}
+      image: {{ if eq .Values.database.type "mysql" }}mysql:8{{ else }}postgres:14{{ end }}
+      {{- end }}
+      imagePullPolicy: IfNotPresent
+      resources:
+        requests:
+          cpu: 10m
+          memory: 64Mi
+        limits:
+          cpu: 200m
+          memory: 128Mi
+      envFrom:
+        - configMapRef:
+            name: {{ include "devlake.db.configmap" . }}
+        - secretRef:
+            name: {{ include "devlake.db.secret" . }}
+      command: ['sh', '-c']
+      args:
+        - |
+          echo "Testing database connection..."
+          {{- if eq .Values.database.type "mysql" }}
+          mysql -h$(MYSQL_SERVER) -P$(MYSQL_PORT) -u$(MYSQL_USER) -p$(MYSQL_PASSWORD) -e "SELECT 1 as test" $(MYSQL_DATABASE)
+          echo "MySQL connection: OK"
+          {{- else if eq .Values.database.type "postgresql" }}
+          PGPASSWORD=$(DB_PASSWORD) psql -h $(DB_SERVER) -p $(DB_PORT) -U $(DB_USER) -d $(DB_DATABASE) -c "SELECT 1 as test"
+          echo "PostgreSQL connection: OK"
+          {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        {{- if eq .Values.database.type "mysql" }}
+        runAsUser: 999
+        {{- else }}
+        runAsUser: 70
+        {{- end }}
+        readOnlyRootFilesystem: true
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: ["ALL"]
+      volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+  containers:
+    - name: test-http
+      image: {{ .Values.alpine.image.repository }}:{{ .Values.alpine.image.tag }}
+      imagePullPolicy: {{ .Values.alpine.image.pullPolicy }}
+      resources:
+        requests:
+          cpu: 10m
+          memory: 32Mi
+        limits:
+          cpu: 100m
+          memory: 64Mi
+      command: ['sh', '-c']
+      args:
+        - |
+          echo "Testing HTTP endpoints..."
+          wget --spider --timeout=5 http://{{ include "devlake.fullname" . }}-lake:8080/ping
+          echo "Lake endpoint: OK"
+          wget --spider --timeout=5 http://{{ include "devlake.fullname" . }}-ui:4000/health/
+          echo "UI endpoint: OK"
+          echo "All tests passed!"
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        readOnlyRootFilesystem: true
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: ["ALL"]
+  volumes:
+    - name: tmp
+      emptyDir: {}
+  restartPolicy: Never

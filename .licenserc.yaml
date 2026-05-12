@@ -1,0 +1,20 @@
+header:
+  license:
+    spdx-id: Apache-2.0
+    copyright-owner: Apache Software Foundation
+
+  paths-ignore:
+    - '**/Chart.lock'
+    - '**/*.md'
+    - '**/*.json'
+    - '.gitignore'
+    - '.trivyignore'
+    - 'LICENSE'
+    - 'NOTICE'
+    - '.licenserc.yaml'
+    - '.mise.toml'
+    - '.pre-commit-config.yaml'
+    - '.yamllint'
+    - '**/*.gotmpl'
+
+  comment: on-failure

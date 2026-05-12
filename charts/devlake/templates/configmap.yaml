@@ -1,36 +1,56 @@
-#
-# Licensed to the Apache Software Foundation (ASF) under one or more
-# contributor license agreements.  See the NOTICE file distributed with
-# this work for additional information regarding copyright ownership.
-# The ASF licenses this file to You under the Apache License, Version 2.0
-# (the "License"); you may not use this file except in compliance with
-# the License.  You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
+{{/*
+Licensed to the Apache Software Foundation (ASF) under one or more
+contributor license agreements.  See the NOTICE file distributed with
+this work for additional information regarding copyright ownership.
+The ASF licenses this file to You under the Apache License, Version 2.0
+(the "License"); you may not use this file except in compliance with
+the License.  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "devlake.mysql.configmap" . }}
+  name: {{ include "devlake.db.configmap" . }}
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "devlake.labels" . | nindent 4 }}
+    app.kubernetes.io/component: config
+  annotations:
+    {{- include "devlake.annotations" . | nindent 4 }}
 data:
   # Database connection configuration (non-sensitive)
-{{- if (eq .Values.option.database "mysql") }}
-  MYSQL_USER: "{{ .Values.mysql.username }}"
-  MYSQL_DATABASE: "{{ .Values.mysql.database }}"
-  MYSQL_URL: "{{ include "mysql.server" . }}:{{ include "mysql.port" . }}"
-  MYSQL_SERVER: "{{ include "mysql.server" . }}"
-  MYSQL_PORT: "{{ include "mysql.port" . }}"
+  # Note: Environment variable naming differs by database type:
+  #   - MySQL: MYSQL_* prefix (standard MySQL client convention)
+  #   - PostgreSQL: DB_* prefix (PostgreSQL client convention)
+  # This follows each database's standard naming to avoid conflicts
+{{- if eq .Values.database.type "mysql" }}
+  MYSQL_USER: "{{ .Values.database.username }}"
+  MYSQL_DATABASE: "{{ .Values.database.database }}"
+  MYSQL_URL: "{{ include "database.server" . }}:{{ include "database.port" . }}"
+  MYSQL_SERVER: "{{ include "database.server" . }}"
+  MYSQL_PORT: "{{ include "database.port" . }}"
   DB_CHARSET: "utf8mb4"
   DB_PARSE_TIME: "True"
   DB_LOCATION: "{{ .Values.commonEnvs.TZ }}"
-  DB_CUSTOM_PARAMS: "{{ .Values.mysql.extraParams }}"
+  DB_CUSTOM_PARAMS: "{{ .Values.database.mysql.extraParams }}"
+{{- else if eq .Values.database.type "postgresql" }}
+  # Lake envs (DB_* prefix)
+  DB_USER: "{{ .Values.database.username }}"
+  DB_DATABASE: "{{ .Values.database.database }}"
+  DB_URL: "{{ include "database.server" . }}:{{ include "database.port" . }}"
+  DB_SERVER: "{{ include "database.server" . }}"
+  DB_PORT: "{{ include "database.port" . }}"
+  DB_CUSTOM_PARAMS: "{{ .Values.database.postgresql.extraParams }}"
+  # Grafana envs (POSTGRES_* prefix for entrypoint.sh)
+  POSTGRES_USER: "{{ .Values.database.username }}"
+  POSTGRES_DATABASE: "{{ .Values.database.database }}"
+  POSTGRES_URL: "{{ include "database.server" . }}:{{ include "database.port" . }}"
 {{- end }}

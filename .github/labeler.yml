@@ -1,0 +1,15 @@
+'area/charts':
+  - changed-files:
+    - any-glob-to-any-file: 'charts/**'
+
+'area/workflows':
+  - changed-files:
+    - any-glob-to-any-file: '.github/workflows/**'
+
+'area/actions':
+  - changed-files:
+    - any-glob-to-any-file: '.github/actions/**'
+
+'area/docs':
+  - changed-files:
+    - any-glob-to-any-file: '**/*.md'

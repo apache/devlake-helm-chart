@@ -15,14 +15,91 @@
 # limitations under the License.
 #
 
-Welcome to use devlake.
+Thank you for installing {{ .Chart.Name }} v{{ .Chart.Version }}!
 
 {{- if .Values.ingress.enabled }}
-Now please visit:
+
+DevLake UI is accessible at:
   {{ include "devlake.uiEndpoint" . }}
 {{- else if contains "NodePort" .Values.service.type }}
-Now please get the URL by running these commands:
-  export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "devlake.fullname" . }}-ui)
-  export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
+
+To access DevLake UI, get the URL:
+  export NODE_PORT=$(kubectl get -n {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" svc {{ include "devlake.fullname" . }}-ui)
+  export NODE_IP=$(kubectl get nodes -n {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
   echo http://$NODE_IP:$NODE_PORT
+{{- else }}
+
+To access DevLake UI, forward the port:
+  kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "devlake.fullname" . }}-ui 4000:4000
+
+Then visit http://localhost:4000
 {{- end }}
+
+================================================================================
+SECURITY & PRODUCTION READINESS
+================================================================================
+{{- if not .Values.networkPolicy.enabled }}
+
+⚠️  NetworkPolicy is DISABLED (not production-safe)
+
+For production, enable NetworkPolicy to isolate traffic:
+
+  helm upgrade {{ .Release.Name }} {{ .Chart.Name }} \
+    --set networkPolicy.enabled=true \
+    --set networkPolicy.externalEgressCIDRs[0]=140.82.112.0/20  # GitHub \
+    --set networkPolicy.externalEgressCIDRs[1]=35.231.145.0/24  # GitLab
+
+Add CIDRs for your integrations (Jira, Jenkins, etc.)
+{{- end }}
+{{- if not .Values.externalSecrets.enabled }}
+{{- if .Values.option.autoCreateSecret }}
+
+⚠️  Using PLAINTEXT secrets from values.yaml
+
+For production, use External Secrets Operator:
+  helm upgrade {{ .Release.Name }} {{ .Chart.Name }} \
+    --set externalSecrets.enabled=true \
+    --set externalSecrets.secretStoreRef.name=<your-store>
+{{- end }}
+{{- end }}
+{{- if or (eq .Values.database.storage.type "hostpath") .Values.lake.hostNetwork }}
+
+⚠️  DEPRECATED configuration detected
+
+• database.storage.type=hostpath → DEPRECATED in v2.1.0, REMOVED in v2.2.0
+• lake.hostNetwork=true → DEPRECATED in v2.1.0, REMOVED in v2.2.0
+
+Migrate before upgrading to v2.2.0 to avoid installation failure.
+{{- end }}
+
+================================================================================
+POD SECURITY STANDARDS (PSS)
+================================================================================
+
+This chart supports PSS "restricted" profile.
+
+To enforce PSS at namespace level:
+
+  kubectl label namespace {{ .Release.Namespace }} \
+    pod-security.kubernetes.io/enforce=restricted \
+    pod-security.kubernetes.io/audit=restricted \
+    pod-security.kubernetes.io/warn=restricted
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+
+If pre-install validation Job fails:
+
+1. Check logs:
+   kubectl logs -n {{ .Release.Namespace }} job/{{ include "devlake.fullname" . }}-pre-install-validation
+
+2. Fix configuration, then retry
+
+3. Emergency bypass (NOT for production):
+   helm install {{ .Release.Name }} {{ .Chart.Name }} --no-hooks
+
+================================================================================
+
+Documentation: https://devlake.apache.org/docs/
+GitHub: https://github.com/apache/incubator-devlake

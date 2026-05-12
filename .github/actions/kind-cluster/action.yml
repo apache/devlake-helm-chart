@@ -1,0 +1,35 @@
+name: Create kind Cluster
+description: Creates a kind Kubernetes cluster with diagnostics on failure
+
+inputs:
+  cluster_name:
+    description: 'Name of the kind cluster to create'
+    required: true
+  namespace:
+    description: 'Kubernetes namespace to create (optional)'
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Create kind cluster
+      run: |
+        kind create cluster --name ${{ inputs.cluster_name }}
+      shell: bash
+
+    - name: Cluster information
+      run: |
+        kubectl cluster-info
+        kubectl get nodes
+        kubectl get pods -n kube-system
+        helm version
+        kubectl version
+        kubectl get storageclasses
+      shell: bash
+
+    - name: Create namespace
+      if: inputs.namespace != ''
+      run: |
+        kubectl create namespace ${{ inputs.namespace }} || true
+      shell: bash
