@@ -73,11 +73,26 @@ jobs:
           helm install "$RELEASE_NAME" ./charts/devlake \
             --namespace "$NAMESPACE" \
             --create-namespace \
-            --wait \
+            --timeout 10m \
             --set database.type="${{ matrix.database }}" \
             --set lake.encryptionSecret.secret="${ENCRYPTION_SECRET}" \
             --set database.password="${DB_PASSWORD}" \
             --set database.mysql.rootPassword="${DB_ROOT_PASSWORD}"
+
+          # Wait specifically for database pod (not full application stack)
+          echo "Waiting for ${{ matrix.database }} database pod to be ready..."
+          kubectl wait --for=condition=ready pod \
+            -l "devlakeComponent=${{ matrix.database }}" \
+            -n "$NAMESPACE" \
+            --timeout=5m
+
+      - name: Run database smoke test
+        run: |
+          if [ "${{ matrix.database }}" = "mysql" ]; then
+            .github/scripts/mysql-smoke-test.sh
+          elif [ "${{ matrix.database }}" = "postgresql" ]; then
+            .github/scripts/postgresql-smoke-test.sh
+          fi
 
       - name: Dump diagnostics on failure
         if: failure()

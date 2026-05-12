@@ -104,7 +104,7 @@ spec:
                 - mysqladmin ping -uroot -p$MYSQL_ROOT_PASSWORD
             initialDelaySeconds: 10
             periodSeconds: 5
-            failureThreshold: 30
+            failureThreshold: 60
           livenessProbe:
             exec:
               command:

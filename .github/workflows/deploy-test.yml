@@ -197,29 +197,8 @@ jobs:
           kubectl get secrets
           kubectl get pvc
 
-      # TODO: using some e2e test code to replace it
-      - name: Curl with endpoints
-        run: |
-          NODE_IP=$(kubectl get nodes --namespace default -o jsonpath="{.items[0].status.addresses[0].address}")
-          failed=0
-          for _ in {1..10} ; do
-            failed=0
-            # home
-            curl --fail "http://${NODE_IP}:30000" || failed=1
-            # API for devlake
-            curl --fail "http://${NODE_IP}:30000/api/blueprints" || failed=1
-            # API for grafana
-            curl --fail "http://${NODE_IP}:30000/grafana/api/health" || failed=1
-            if [ $failed -eq 0 ] ; then
-              break
-            else
-              sleep 3
-            fi
-          done
-          if [ $failed -ne 0 ] ; then
-            echo 'Test apis failed, please check logs from the PODS'
-            exit 1
-          fi
+      - name: Run E2E smoke tests
+        run: .github/scripts/e2e-smoke-test.sh
 
       - name: Dump diagnostics on failure
         if: failure()
