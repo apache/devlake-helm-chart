@@ -20,8 +20,8 @@ description: Apache DevLake is an open-source dev data platform that ingests, an
 home: https://devlake.apache.org/
 icon: https://devlake.apache.org/img/logo.svg
 sources:
-  - https://github.com/apache/incubator-devlake
-  - https://github.com/apache/incubator-devlake-helm-chart
+  - https://github.com/apache/devlake
+  - https://github.com/apache/devlake-helm-chart
 keywords:
   - devlake
 

@@ -1,6 +1,6 @@
 {{- if and .Values.lake.encryptionSecret.autoCreateSecret (not .Values.lake.encryptionSecret.secret) }}
 {{- fail
-"Helm test requires lake.encryptionSecret.secret.\n\n  - If you're upgrading from DevLake v0.17.x or earlier versions, please get the encryption secret by copying the ENCODE_KEY value from /app/config/.env of the lake pod (e.g. devlake-lake-0);\n  - If upgrading from v0.18.0+, get the original secret in k8s secret and decode it\n  - If new installation, get the encryption secret via command `openssl rand -base64 2000 | tr -dc 'A-Z' | fold -w 128 | head -n 1`.\n\nFor more information, please check https://github.com/apache/incubator-devlake-helm-chart"
+"Helm test requires lake.encryptionSecret.secret.\n\n  - If you're upgrading from DevLake v0.17.x or earlier versions, please get the encryption secret by copying the ENCODE_KEY value from /app/config/.env of the lake pod (e.g. devlake-lake-0);\n  - If upgrading from v0.18.0+, get the original secret in k8s secret and decode it\n  - If new installation, get the encryption secret via command `openssl rand -base64 2000 | tr -dc 'A-Z' | fold -w 128 | head -n 1`.\n\nFor more information, please check https://github.com/apache/devlake-helm-chart"
 }}
 {{- end }}
 
