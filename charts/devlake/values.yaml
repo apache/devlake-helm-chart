@@ -26,6 +26,9 @@ imagePullSecrets: []
 commonEnvs:
   TZ: "UTC"
 
+# kubernetes cluster domain
+clusterDomain: cluster.local
+
 mysql:
   replicaCount: 1
   # if use external mysql server, please set true

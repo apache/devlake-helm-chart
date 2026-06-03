@@ -86,7 +86,7 @@ spec:
           {{- end }}
           env:
             - name: DEVLAKE_ENDPOINT
-              value: {{ include "devlake.fullname" . }}-lake.{{ .Release.Namespace }}.svc.cluster.local:8080
+              value: {{ include "devlake.fullname" . }}-lake.{{ .Release.Namespace }}.svc.{{ .Values.clusterDomain }}:8080
 {{- if not .Values.grafana.enabled }}
             - name: GRAFANA_ENDPOINT
               value: {{ .Values.grafana.external.url }}
@@ -94,7 +94,7 @@ spec:
               value: "true"
 {{- else }}
             - name: GRAFANA_ENDPOINT
-              value: {{ .Release.Name }}-grafana.{{ .Release.Namespace }}.svc.cluster.local:80
+              value: {{ .Release.Name }}-grafana.{{ .Release.Namespace }}.svc.{{ .Values.clusterDomain }}:80
 {{- end }}
             {{- range $key, $value := .Values.commonEnvs }}
             - name: "{{ tpl $key $ }}"
