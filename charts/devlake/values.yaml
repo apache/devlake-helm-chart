@@ -188,6 +188,8 @@ lake:
 
   #extra envs from an existing secret
   extraEnvsFromSecret: ""
+  # Set different container command
+  command: []
   encryptionSecret:
     # The name of secret which contains keys named ENCRYPTION_SECRET
     secretName: ""

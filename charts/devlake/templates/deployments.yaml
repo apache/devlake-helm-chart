@@ -218,6 +218,10 @@ spec:
             - name: "{{ tpl $key2 $ }}"
               value: "{{ tpl (print $value2) $ }}"
             {{- end }}
+          {{- with .Values.lake.command }}
+          command:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           {{- with .Values.lake.resources }}
           resources:
           {{- toYaml . | nindent 12 }}
