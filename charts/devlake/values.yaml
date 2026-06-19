@@ -134,7 +134,6 @@ grafana:
   external:
     url: ""
   image:
-    registry: devlake.docker.scarf.sh
     repository: apache/devlake-dashboard
     tag: v1.0.3-beta13
   deploymentStrategy:
@@ -163,7 +162,7 @@ lake:
   replicaCount: 1
   revisionHistoryLimit: 10
   image:
-    repository: devlake.docker.scarf.sh/apache/devlake
+    repository: apache/devlake
     pullPolicy: Always
     # defaults to imageTag; if set, lake.image.tag will override imageTag
     # tag:
@@ -274,7 +273,7 @@ ui:
   replicaCount: 1
   revisionHistoryLimit: 10
   image:
-    repository: devlake.docker.scarf.sh/apache/devlake-config-ui
+    repository: apache/devlake-config-ui
     pullPolicy: Always
     # defaults to imageTag; if set, lake.image.tag will override imageTag
     # tag:

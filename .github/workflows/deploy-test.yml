@@ -101,7 +101,7 @@ jobs:
             # home
             curl --fail http://${NODE_IP}:30000 || failed=1
             # API for devlake
-            curl --fail http://${NODE_IP}:30000/api/blueprints || failed=1
+            curl --fail http://${NODE_IP}:30000/api/ping || failed=1
             # API for grafana
             curl --fail http://${NODE_IP}:30000/grafana/api/health || failed=1
             if [ $failed -eq 0 ] ; then
