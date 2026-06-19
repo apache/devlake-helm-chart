@@ -58,16 +58,23 @@ jobs:
       - name: Helm install devlake
         if: matrix.database_type == 'mysql-external'
         run: |
-          helm repo add bitnami https://charts.bitnami.com/bitnami
           helm repo add grafana https://grafana.github.io/helm-charts
-          helm install mysql bitnami/mysql --version 9.19.1 --set auth.rootPassword=admin --set auth.database=lake --set auth.username=merico --set auth.password=merico
-          # external mysql at service: mysql
+          kubectl run mysql --image=mysql:8.0 \
+            --env="MYSQL_ROOT_PASSWORD=admin" \
+            --env="MYSQL_DATABASE=lake" \
+            --env="MYSQL_USER=merico" \
+            --env="MYSQL_PASSWORD=merico" \
+            --port=3306
+          kubectl expose pod mysql --port=3306
+          kubectl wait --for=condition=ready pod/mysql --timeout=300s
           helm dep build charts/devlake
-          helm install --debug --wait --timeout 2400s deploy-test charts/devlake \
+          helm install --debug --wait --timeout 600s deploy-test charts/devlake \
             --set service.uiPort=30000 \
             --set mysql.useExternal=true \
             --set mysql.externalServer=mysql \
-            --set lake.encryptionSecret.secret=$(openssl rand -base64 2000 | tr -dc 'A-Z' | fold -w 128 | head -n 1)
+            --set grafana.persistence.enabled=false \
+            --set lake.encryptionSecret.secret=$(openssl rand -base64 2000 | tr -dc 'A-Z' | fold -w 128 | head -n 1) \
+          || { kubectl get pods -o wide; kubectl describe pods; kubectl get events --sort-by='.lastTimestamp'; exit 1; }
 
       - name: Helm install devlake
         if: matrix.database_type == 'mysql-builtin'
@@ -76,10 +83,12 @@ jobs:
           helm dep build charts/devlake
           export NODE_IP=$(kubectl get nodes --namespace default -o jsonpath="{.items[0].status.addresses[0].address}")
           echo Node IP: ${NODE_IP}
-          helm install --debug --wait --timeout 2400s deploy-test charts/devlake \
+          helm install --debug --wait --timeout 600s deploy-test charts/devlake \
             --set service.uiPort=30000 \
             --set mysql.image.tag=8-debian \
-            --set lake.encryptionSecret.secret=$(openssl rand -base64 2000 | tr -dc 'A-Z' | fold -w 128 | head -n 1)
+            --set grafana.persistence.enabled=false \
+            --set lake.encryptionSecret.secret=$(openssl rand -base64 2000 | tr -dc 'A-Z' | fold -w 128 | head -n 1) \
+          || { kubectl get pods -o wide; kubectl describe pods; kubectl get events --sort-by='.lastTimestamp'; exit 1; }
 
       - name: List cluster resources
         if: ${{ always() }}
