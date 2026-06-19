@@ -194,6 +194,30 @@ entries:
     - https://github.com/apache/incubator-devlake-helm-chart/releases/download/devlake-1.0.3-beta2/devlake-1.0.3-beta2.tgz
     version: 1.0.3-beta2
   - apiVersion: v2
+    appVersion: v1.0.3-beta13
+    created: "2026-06-19T18:17:10.733821382Z"
+    dependencies:
+    - condition: grafana.enabled
+      name: grafana
+      repository: https://grafana.github.io/helm-charts
+      version: 9.3.2
+    description: Apache DevLake is an open-source dev data platform that ingests,
+      analyzes, and visualizes the fragmented data from DevOps tools to distill insights
+      for engineering productivity.
+    digest: 983a04e84ac657adf3f08b0411bb0a1d0a1dba13ded1e73942e20f6ca4d8a6b9
+    home: https://devlake.apache.org/
+    icon: https://devlake.apache.org/img/logo.svg
+    keywords:
+    - devlake
+    name: devlake
+    sources:
+    - https://github.com/apache/devlake
+    - https://github.com/apache/devlake-helm-chart
+    type: application
+    urls:
+    - https://github.com/apache/devlake-helm-chart/releases/download/devlake-1.0.3-beta13/devlake-1.0.3-beta13.tgz
+    version: 1.0.3-beta13
+  - apiVersion: v2
     appVersion: v1.0.3-beta10
     created: "2026-03-12T14:53:10.793221201Z"
     dependencies:
@@ -3334,4 +3358,4 @@ entries:
     urls:
     - https://github.com/apache/incubator-devlake-helm-chart/releases/download/devlake-v0.14.2-1/devlake-v0.14.2-1.tgz
     version: v0.14.2-1
-generated: "2026-03-12T14:53:10.793850136Z"
+generated: "2026-06-19T18:17:10.73454502Z"
