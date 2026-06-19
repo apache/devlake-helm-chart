@@ -17,7 +17,7 @@
 
 # replica count
 replicaCount: 1
-imageTag: v1.0.3-beta10
+imageTag: v1.0.3-beta13
 
 # image pull secrets
 imagePullSecrets: []
@@ -136,7 +136,7 @@ grafana:
   image:
     registry: devlake.docker.scarf.sh
     repository: apache/devlake-dashboard
-    tag: v1.0.3-beta10
+    tag: v1.0.3-beta13
   deploymentStrategy:
     type: Recreate
   adminPassword: ""
