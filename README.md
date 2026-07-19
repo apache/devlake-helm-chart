@@ -38,7 +38,7 @@ helm install devlake devlake/devlake --set lake.encryptionSecret.secret=$ENCRYPT
 helm repo add devlake https://apache.github.io/devlake-helm-chart
 helm repo update
 ENCRYPTION_SECRET=$(openssl rand -base64 2000 | tr -dc 'A-Z' | fold -w 128 | head -n 1)
-helm install devlake devlake/devlake --version=1.0.3-beta14 --set lake.encryptionSecret.secret=$ENCRYPTION_SECRET
+helm install devlake devlake/devlake --version=1.0.3-beta15 --set lake.encryptionSecret.secret=$ENCRYPTION_SECRET
 ```
 
 Helm chart are also published to GitHub container registry as OCI artifact.
@@ -73,14 +73,14 @@ grafana by url `http://YOUR-NODE-IP:30091`
 
 ```shell
 helm repo update
-helm upgrade devlake devlake/devlake --version=1.0.3-beta14 --set lake.encryptionSecret.secret=<ENCRYPTION_SECRET>
+helm upgrade devlake devlake/devlake --version=1.0.3-beta15 --set lake.encryptionSecret.secret=<ENCRYPTION_SECRET>
 ```
 
 **If you're upgrading from DevLake v0.18.x or later versions:**
 
 ```shell
 helm repo update
-helm upgrade devlake devlake/devlake --version=1.0.3-beta14
+helm upgrade devlake devlake/devlake --version=1.0.3-beta15
 ```
 
 ## Uninstall
