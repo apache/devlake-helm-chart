@@ -147,6 +147,7 @@ Some useful parameters for the chart, you could also check them in values.yaml
 | imageTag                               | The version tag for all images                                                        | see Values.yaml          |
 | imagePullSecrets                       | Name of the Secret for accessing private image registries                             | []                       |
 | commonEnvs                             | The common envs for all pods except grafana                                           | {TZ: "UTC"}              |
+| clusterDomain                               | Kubernetes cluster domain                                                        | cluster.local          |
 | mysql.replicaCount                     | Replica count can only be 0 or 1                                                      | 1                        |
 | mysql.useExternal                      | If use external mysql server, set true                                                | false                    |
 | mysql.externalServer                   | External mysql server address                                                         | 127.0.0.1                |
