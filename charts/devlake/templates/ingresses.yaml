@@ -81,10 +81,10 @@ spec:
               service:
                 name: {{ $uiServiceName }}
                 port:
-                  number: 4000
+                  number: {{ .Values.ui.service.port }}
               {{- else }}
               serviceName: {{ $uiServiceName }}
-              servicePort: 4000
+              servicePort: {{ .Values.ui.service.port }}
               {{- end }}
           {{- if .Values.ingress.extraPaths }}
             {{- toYaml .Values.ingress.extraPaths | nindent 10 }}
@@ -133,10 +133,10 @@ spec:
               service:
                 name: {{ $uiServiceName }}
                 port:
-                  number: 4000
+                  number: {{ .Values.ui.service.port }}
               {{- else }}
               serviceName: {{ $uiServiceName }}
-              servicePort: 4000
+              servicePort: {{ .Values.ui.service.port }}
               {{- end }}
 {{- end }}
 {{- end }}

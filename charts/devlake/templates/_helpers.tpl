@@ -147,7 +147,7 @@ The mysql port
 {{- if .Values.mysql.useExternal }}
 {{- .Values.mysql.externalPort }}
 {{- else }}
-{{- 3306 }}
+{{- .Values.mysql.service.port }}
 {{- end }}
 {{- end }}
 

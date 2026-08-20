@@ -123,6 +123,8 @@ mysql:
 
   service:
     type: "ClusterIP"
+    # Port exposed by the in-cluster MySQL service.
+    port: 3306
     nodePort: ""
     loadBalancerIP: ""
     extraLabels: {}
@@ -224,7 +226,7 @@ lake:
   livenessProbe:
     httpGet:
       path: /ping
-      port: 8080
+      port: lake
       scheme: HTTP
     failureThreshold: 5
     initialDelaySeconds: 30
@@ -235,7 +237,7 @@ lake:
   readinessProbe:
     httpGet:
       path: /ping
-      port: 8080
+      port: lake
       scheme: HTTP
     failureThreshold: 3
     initialDelaySeconds: 5
@@ -290,7 +292,7 @@ ui:
   livenessProbe:
     httpGet:
       path: /health/
-      port: 4000
+      port: ui
       scheme: HTTP
     failureThreshold: 5
     initialDelaySeconds: 15
@@ -301,7 +303,7 @@ ui:
   readinessProbe:
     httpGet:
       path: /health/
-      port: 4000
+      port: ui
       scheme: HTTP
     failureThreshold: 3
     initialDelaySeconds: 5
@@ -343,6 +345,8 @@ ui:
     extraLabels: {}
 
   service:
+    # Port exposed by the UI service. The UI container listens on port 4000.
+    port: 4000
     extraLabels: {}
 
   ## Side Contaainer Configuration

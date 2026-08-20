@@ -167,6 +167,7 @@ Some useful parameters for the chart, you could also check them in values.yaml
 | mysql.securityContext                  | pod security context values                                                           | {}                       |
 | mysql.containerSecurityContext         | container security context values                                                     | {}                       |
 | mysql.service.type                     | mysql service type                                                                    | ClusterIP                |
+| mysql.service.port                     | port exposed by the internal mysql service                                             | 3306                     |
 | mysql.service.nodePort                 | specify mysql nodeport                                                                | ""                       |
 | grafana                                | dashboard, datasource, etc. settings for grafana, installed by grafana official chart |                          |
 | lake.replicaCount                      | Replica count can only be 0 or 1                                                      | 1                        |
@@ -200,6 +201,7 @@ Some useful parameters for the chart, you could also check them in values.yaml
 | ui.livenessProbe                       | container livenessprobe                                                               | see Values.yaml          |
 | ui.readinessProbe                      | container readinessProbe                                                              | see Values.yaml          |
 | ui.deployment.extraLabels              | extra labels for ui's deployment metadata                                             | {}                       |
+| ui.service.port                        | port exposed by the ui service; the container still listens on port 4000               | 4000                     |
 | service.type                           | Service type for exposed service                                                      | NodePort                 |
 | service.uiPort                         | Node port for config ui                                                               | 32001                    |
 | ingress.enabled                        | If enable ingress                                                                     | false                    |

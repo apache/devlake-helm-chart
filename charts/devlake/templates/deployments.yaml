@@ -70,7 +70,8 @@ spec:
 {{- end }}
           imagePullPolicy: {{ .Values.ui.image.pullPolicy }}
           ports:
-            - containerPort: 4000
+            - name: ui
+              containerPort: 4000
           {{- with .Values.ui.livenessProbe }}
           livenessProbe:
             {{- toYaml . | nindent 12 }}
@@ -86,7 +87,7 @@ spec:
           {{- end }}
           env:
             - name: DEVLAKE_ENDPOINT
-              value: {{ include "devlake.fullname" . }}-lake.{{ .Release.Namespace }}.svc.cluster.local:8080
+              value: {{ include "devlake.fullname" . }}-lake.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.lake.port }}
 {{- if not .Values.grafana.enabled }}
             - name: GRAFANA_ENDPOINT
               value: {{ .Values.grafana.external.url }}
@@ -94,7 +95,7 @@ spec:
               value: "true"
 {{- else }}
             - name: GRAFANA_ENDPOINT
-              value: {{ .Release.Name }}-grafana.{{ .Release.Namespace }}.svc.cluster.local:80
+              value: {{ .Release.Name }}-grafana.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.grafana.service.port }}
 {{- end }}
             {{- range $key, $value := .Values.commonEnvs }}
             - name: "{{ tpl $key $ }}"
@@ -183,7 +184,8 @@ spec:
           {{- end }}
           imagePullPolicy: {{ .Values.lake.image.pullPolicy }}
           ports:
-            - containerPort: {{ .Values.lake.port }}
+            - name: lake
+              containerPort: {{ .Values.lake.port }}
           {{- with .Values.lake.livenessProbe }}
           livenessProbe:
             {{- toYaml . | nindent 12 }}
@@ -254,5 +256,4 @@ spec:
       tolerations:
       {{- toYaml . | nindent 8 }}
   {{- end }}
-
 
