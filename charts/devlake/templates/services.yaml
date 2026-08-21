@@ -39,8 +39,8 @@ spec:
   ports:
     - protocol: TCP
       name: mysql
-      port: 3306
-      targetPort: 3306
+      port: {{ .Values.mysql.service.port }}
+      targetPort: mysql
       {{- if and (eq .Values.mysql.service.type "NodePort") .Values.mysql.service.nodePort }}
       nodePort: {{ .Values.mysql.service.nodePort }}
       {{- end }}
@@ -65,7 +65,7 @@ spec:
     - protocol: TCP
       name: devlake
       port: {{ .Values.lake.port }}
-      targetPort: {{ .Values.lake.port }}
+      targetPort: lake
 
 ---
 # ui
@@ -86,8 +86,8 @@ spec:
   ports:
     - protocol: TCP
       name: ui
-      port: 4000
-      targetPort: 4000
+      port: {{ .Values.ui.service.port }}
+      targetPort: ui
       {{- if eq .Values.service.type "NodePort" }}
       nodePort: {{ .Values.service.uiPort }}
       {{- end }}
