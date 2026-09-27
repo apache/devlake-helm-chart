@@ -17,7 +17,7 @@
 
 # replica count
 replicaCount: 1
-imageTag: v1.0.3-beta15
+imageTag: v1.0.3-beta18
 
 # image pull secrets
 imagePullSecrets: []
@@ -137,7 +137,7 @@ grafana:
     url: ""
   image:
     repository: apache/devlake-dashboard
-    tag: v1.0.3-beta15
+    tag: v1.0.3-beta18
   deploymentStrategy:
     type: Recreate
   adminPassword: ""
