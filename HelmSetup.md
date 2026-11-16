@@ -183,6 +183,7 @@ Some useful parameters for the chart, you could also check them in values.yaml
 | lake.securityContext                   | pod security context values                                                           | {}                       |
 | lake.strategy                          | pod update strategy                                                                   | {}                       |
 | lake.containerSecurityContext          | container security context values                                                     | {}                       |
+| lake.waitDatabase.enabled              | whether to wait for the database before starting lake                                 | true                     |
 | lake.livenessProbe                     | container livenessprobe                                                               | see Values.yaml          |
 | lake.readinessProbe                    | container readinessProbe                                                              | see Values.yaml          |
 | lake.deployment.extraLabels            | extra labels for lake's deployment metadata                                           | {}                       |
@@ -196,6 +197,8 @@ Some useful parameters for the chart, you could also check them in values.yaml
 | ui.basicAuth.secretName                | The basic auth secret name                                                            | ""                       |
 | ui.extraLabels                         | extra labels for ui's deployment template                                             | {}                       |
 | ui.securityContext                     | pod security context values                                                           | {}                       |
+| ui.volumes                             | additional volumes for the UI pod                                                     | []                       |
+| ui.volumeMounts                        | additional volume mounts for the UI container                                        | []                       |
 | ui.strategy                            | pod update strategy                                                                   | {}                       |
 | ui.containerSecurityContext            | container security context values                                                     | {}                       |
 | ui.livenessProbe                       | container livenessprobe                                                               | see Values.yaml          |
