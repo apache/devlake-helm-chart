@@ -223,6 +223,10 @@ lake:
 
   initContainers: []
 
+  waitDatabase:
+    # Disable the database wait init container when a sidecar prevents it from completing.
+    enabled: true
+
   livenessProbe:
     httpGet:
       path: /ping
@@ -280,6 +284,18 @@ ui:
     # defaults to imageTag; if set, lake.image.tag will override imageTag
     # tag:
   resources: {}
+
+  # Additional volumes for the config-ui Pod. Example:
+  # volumes:
+  #   - name: nginx
+  #     emptyDir: {}
+  volumes: []
+
+  # Additional volume mounts for the config-ui container. Example:
+  # volumeMounts:
+  #   - name: nginx
+  #     mountPath: /etc/nginx/conf.d
+  volumeMounts: []
 
   strategy: {}
 

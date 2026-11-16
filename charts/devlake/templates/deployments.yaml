@@ -72,6 +72,10 @@ spec:
           ports:
             - name: ui
               containerPort: 4000
+          {{- with .Values.ui.volumeMounts }}
+          volumeMounts:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           {{- with .Values.ui.livenessProbe }}
           livenessProbe:
             {{- toYaml . | nindent 12 }}
@@ -122,6 +126,11 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
 
+      {{- with .Values.ui.volumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
 ---
 # devlake
 apiVersion: apps/v1
@@ -166,15 +175,25 @@ spec:
       securityContext:
       {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- $waitDatabase := true }}
+      {{- with .Values.lake.waitDatabase }}
+      {{- if hasKey . "enabled" }}
+      {{- $waitDatabase = .enabled }}
+      {{- end }}
+      {{- end }}
+      {{- if or .Values.lake.initContainers $waitDatabase }}
       initContainers:
         {{- if .Values.lake.initContainers }}
           {{- toYaml .Values.lake.initContainers | nindent 8 }}
         {{- end }}
+        {{- if $waitDatabase }}
         {{- include "common.initContainerWaitDatabase" . | nindent 8 }}
         {{- with .Values.lake.initContainerSecurityContext }}
           securityContext:
           {{- toYaml . | nindent 12 }}
         {{- end }}
+        {{- end }}
+      {{- end }}
       containers:
         - name: lake
           {{- if .Values.lake.image.tag }}
