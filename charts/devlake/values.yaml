@@ -223,6 +223,15 @@ lake:
 
   initContainers: []
 
+  # Extra containers to run next to the lake container, for example a database
+  # proxy sidecar such as cloud-sql-proxy. Values are rendered as templates.
+  extraContainers: []
+  # - name: cloud-sql-proxy
+  #   image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2
+  #   args:
+  #     - "--port=3306"
+  #     - "my-project:my-region:my-instance"
+
   livenessProbe:
     httpGet:
       path: /ping

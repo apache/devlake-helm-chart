@@ -186,6 +186,7 @@ Some useful parameters for the chart, you could also check them in values.yaml
 | lake.livenessProbe                     | container livenessprobe                                                               | see Values.yaml          |
 | lake.readinessProbe                    | container readinessProbe                                                              | see Values.yaml          |
 | lake.deployment.extraLabels            | extra labels for lake's deployment metadata                                           | {}                       |
+| lake.extraContainers                   | extra containers (sidecars) to run in the lake pod                                    | []                       |
 | ui.replicaCount                        | Replica count for ui                                                                  | 1                        |
 | ui.image.repository                    | repository for ui's image                                                             | apache/devlake-config-ui |
 | ui.image.pullPolicy                    | pullPolicy for ui's image                                                             | Always                   |
